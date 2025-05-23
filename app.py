@@ -1,12 +1,20 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import streamlit as st
+import os
 
-# 設定字型避免中文亂碼（macOS）
-plt.rcParams['font.family'] = 'AppleGothic'
+# --- 設定中文字體（使用思源黑體） ---
+font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
+if os.path.exists(font_path):
+    prop = fm.FontProperties(fname=font_path)
+    plt.rcParams['font.family'] = prop.get_name()
+else:
+    plt.rcParams['font.family'] = 'sans-serif'
+
 plt.rcParams['axes.unicode_minus'] = False
 
-# 讀檔
+# --- 讀檔 ---
 df = pd.read_excel("data/transactions.xlsx")
 df = df[df["備註"] == "Lo"]
 df["交易日期"] = pd.to_datetime(df["交易日期"])
@@ -30,12 +38,11 @@ for month in all_months:
     for code in all_codes:
         monthly_holding.at[month, code] = current_holding[code]
 
-# 轉成文字 index 方便畫圖
 monthly_holding.index = monthly_holding.index.astype(str)
 
 # --- Streamlit Layout ---
 st.set_page_config(layout="wide")
-st.title("📈 Lo 每月持股變化總覽（直方圖）")
+st.title("📊 Lo 每月持股變化（直方圖總覽）")
 
 # 分批每4張顯示
 chunk_size = 4
@@ -47,9 +54,14 @@ for chunk in chunks:
         with cols[i % 2]:
             fig, ax = plt.subplots(figsize=(8, 4))
             ax.bar(monthly_holding.index, monthly_holding[code], color='skyblue')
-            ax.set_title(f"Lo 每月 {code} 持股數量變化")
+            ax.set_title(f"Lo 每月 {code} 持股數變化")
             ax.set_xlabel("月份")
             ax.set_ylabel("持股數")
             ax.set_ylim(0, 15000)
-            plt.xticks(rotation=45)
+
+            # x軸只顯示每3個月一格，避免擁擠
+            ax.set_xticks(ax.get_xticks()[::3])
+            ax.tick_params(axis='x', labelrotation=45)
+
+            plt.tight_layout()
             st.pyplot(fig)
