@@ -44,7 +44,7 @@ monthly_holding.index = monthly_holding.index.to_timestamp()
 
 # --- Streamlit Layout ---
 st.set_page_config(layout="wide")
-st.title("📊 Lo 每月持股變化（深藍科技風）")
+st.title("📊 Lo每月持股變化")
 
 # 分批每4張顯示
 chunk_size = 4
