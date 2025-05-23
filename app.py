@@ -4,14 +4,16 @@ import matplotlib.font_manager as fm
 import streamlit as st
 import os
 
-# --- 設定中文字體（使用思源黑體） ---
-font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
+# --- 中文字體設定（macOS） ---
+font_path = "/System/Library/Fonts/PingFang.ttc"
 if os.path.exists(font_path):
     prop = fm.FontProperties(fname=font_path)
     plt.rcParams['font.family'] = prop.get_name()
 else:
     plt.rcParams['font.family'] = 'sans-serif'
+
 plt.rcParams['axes.unicode_minus'] = False
+plt.style.use('dark_background')  # 深色背景風格
 
 # --- 讀檔 ---
 df = pd.read_excel("data/transactions.xlsx")
@@ -37,12 +39,12 @@ for month in all_months:
     for code in all_codes:
         monthly_holding.at[month, code] = current_holding[code]
 
-# 將 index 轉為 timestamp，方便控制 x 軸標籤格式
+# datetime index 用於格式化 x 軸
 monthly_holding.index = monthly_holding.index.to_timestamp()
 
 # --- Streamlit Layout ---
 st.set_page_config(layout="wide")
-st.title("📊 Lo 每月持股變化（直方圖總覽）")
+st.title("📊 Lo 每月持股變化（深藍科技風）")
 
 # 分批每4張顯示
 chunk_size = 4
@@ -53,26 +55,33 @@ for chunk in chunks:
     for i, code in enumerate(chunk):
         with cols[i % 2]:
             values = monthly_holding[code].astype(float)
-            colors = ['skyblue'] * len(values)
-
-            # 若最後一段全為 0，代表出清，則整段變灰
-            if (values != 0).any() and values[values != 0].iloc[-1] == 0:
-                colors = ['lightgray'] * len(values)
+            # 找出首次歸零的位置
+            drop_index = None
+            for idx in range(1, len(values)):
+                if values.iloc[idx] == 0 and values.iloc[idx - 1] > 0:
+                    drop_index = idx
+                    break
+            # 設定 bar 顏色：歸零後與前皆為灰
+            if drop_index is not None:
+                colors = ['gray' if idx <= drop_index else 'skyblue' for idx in range(len(values))]
+            else:
+                colors = ['skyblue'] * len(values)
 
             fig, ax = plt.subplots(figsize=(8, 4))
-            ax.bar(monthly_holding.index, values, color=colors)
-
-            # 美化 x 軸：只顯示年份
-            ax.set_xticks(
-                [d for d in monthly_holding.index if d.month == 1]
-            )
-            ax.set_xticklabels(
-                [d.strftime('%Y') for d in monthly_holding.index if d.month == 1]
-            )
-
-            ax.set_title(f"Lo 每月 {code} 持股數變化")
+            bars = ax.bar(monthly_holding.index, values, color=colors, width=20)
+            ax.set_title(f"Lo 每月 {code} 持股變化")
             ax.set_xlabel("年")
             ax.set_ylabel("持股數")
             ax.set_ylim(0, 15000)
+            ax.set_facecolor("#0b1c2c")
+            fig.patch.set_facecolor('#0b1c2c')
+            ax.tick_params(axis='x', labelrotation=45, colors='lightgray')
+            ax.tick_params(axis='y', colors='lightgray')
+            ax.spines['bottom'].set_color('lightgray')
+            ax.spines['left'].set_color('lightgray')
+            ax.title.set_color('white')
+            ax.yaxis.label.set_color('lightgray')
+            ax.xaxis.label.set_color('lightgray')
+
             plt.tight_layout()
             st.pyplot(fig)
