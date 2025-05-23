@@ -11,7 +11,6 @@ if os.path.exists(font_path):
     plt.rcParams['font.family'] = prop.get_name()
 else:
     plt.rcParams['font.family'] = 'sans-serif'
-
 plt.rcParams['axes.unicode_minus'] = False
 
 # --- 讀檔 ---
@@ -38,10 +37,8 @@ for month in all_months:
     for code in all_codes:
         monthly_holding.at[month, code] = current_holding[code]
 
-# 轉成年月格式與額外標註年份
+# 將 index 轉為 timestamp，方便控制 x 軸標籤格式
 monthly_holding.index = monthly_holding.index.to_timestamp()
-monthly_holding["月份"] = monthly_holding.index.strftime("%Y-%m")
-monthly_holding["年份"] = monthly_holding.index.year.astype(str)
 
 # --- Streamlit Layout ---
 st.set_page_config(layout="wide")
@@ -51,31 +48,30 @@ st.title("📊 Lo 每月持股變化（直方圖總覽）")
 chunk_size = 4
 chunks = [all_codes[i:i+chunk_size] for i in range(0, len(all_codes), chunk_size)]
 
-monthly_holding.set_index("月份", inplace=True)
-
 for chunk in chunks:
     cols = st.columns(2)
     for i, code in enumerate(chunk):
         with cols[i % 2]:
             values = monthly_holding[code].astype(float)
-
-            # 計算變色：一旦變0就往後全部灰色
             colors = ['skyblue'] * len(values)
-            for idx in range(len(values)):
-                if values.iloc[idx] == 0 and idx > 0 and values.iloc[idx - 1] > 0:
-                    colors[idx:] = ['lightgray'] * (len(values) - idx)
-                    break
+
+            # 若最後一段全為 0，代表出清，則整段變灰
+            if (values != 0).any() and values[values != 0].iloc[-1] == 0:
+                colors = ['lightgray'] * len(values)
 
             fig, ax = plt.subplots(figsize=(8, 4))
-            ax.bar(values.index, values.values, color=colors)
+            ax.bar(monthly_holding.index, values, color=colors)
 
-            # X軸只顯示每年1月的 label
-            xticks = [i for i, x in enumerate(values.index) if x.endswith("-01") or i == 0]
-            ax.set_xticks(xticks)
-            ax.set_xticklabels([values.index[i][:4] for i in xticks])
+            # 美化 x 軸：只顯示年份
+            ax.set_xticks(
+                [d for d in monthly_holding.index if d.month == 1]
+            )
+            ax.set_xticklabels(
+                [d.strftime('%Y') for d in monthly_holding.index if d.month == 1]
+            )
 
-            ax.set_title(f"Lo 每月 {code} 持股變化")
-            ax.set_xlabel("年份")
+            ax.set_title(f"Lo 每月 {code} 持股數變化")
+            ax.set_xlabel("年")
             ax.set_ylabel("持股數")
             ax.set_ylim(0, 15000)
             plt.tight_layout()
