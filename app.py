@@ -1,13 +1,16 @@
 import streamlit as st
 
-st.set_page_config(page_title="投資儀表板", layout="wide")
+st.set_page_config(layout="wide")
+st.title("📊 投資追蹤系統首頁")
 
-st.title("📊 投資儀表板首頁")
 st.markdown("""
-歡迎使用投資追蹤系統。
+歡迎使用你的投資追蹤分析平台 👋  
+請透過左側選單選擇要進行的分析功能。
 
-請從左側功能表選擇要執行的分析項目：
-- 📈 每月持股分析
-- 💰 資產估算（台幣）
-- 📊 損益分析（開發中）
+---
+
+### 可用功能：
+- 每月持股變化總覽（疊加直方圖）
+- 每月資產價值（台幣換算）
+- 年度損益分析（開發中）
 """)
