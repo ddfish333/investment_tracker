@@ -19,6 +19,7 @@ df = pd.read_excel("data/transactions.xlsx")
 df = df[df["備註"] == "Lo"]
 df["交易日期"] = pd.to_datetime(df["交易日期"])
 df["月份"] = df["交易日期"].dt.to_period("M")
+df["年份"] = df["交易日期"].dt.year.astype(str)
 
 # 整理代號與月份
 all_codes = sorted(df["股票代號"].dropna().unique())
@@ -38,11 +39,14 @@ for month in all_months:
     for code in all_codes:
         monthly_holding.at[month, code] = current_holding[code]
 
-monthly_holding.index = monthly_holding.index.astype(str)
+# 將 index 轉成 datetime 再轉成年份
+monthly_holding.index = monthly_holding.index.to_timestamp()
+monthly_holding["年份"] = monthly_holding.index.year.astype(str)
+monthly_grouped = monthly_holding.groupby("年份").last()
 
 # --- Streamlit Layout ---
 st.set_page_config(layout="wide")
-st.title("📊 Lo 每月持股變化（直方圖總覽）")
+st.title("📊 Lo 每年持股變化（直方圖總覽）")
 
 # 分批每4張顯示
 chunk_size = 4
@@ -52,16 +56,19 @@ for chunk in chunks:
     cols = st.columns(2)
     for i, code in enumerate(chunk):
         with cols[i % 2]:
+            values = monthly_grouped[code].astype(float)
+            colors = ['skyblue'] * len(values)
+            for idx in range(len(values)):
+                if values.iloc[idx] == 0 and idx > 0 and values.iloc[idx - 1] > 0:
+                    colors[idx:] = ['lightgray'] * (len(values) - idx)
+                    break
+
             fig, ax = plt.subplots(figsize=(8, 4))
-            ax.bar(monthly_holding.index, monthly_holding[code], color='skyblue')
-            ax.set_title(f"Lo 每月 {code} 持股數變化")
-            ax.set_xlabel("月份")
+            ax.bar(monthly_grouped.index, values, color=colors)
+            ax.set_title(f"Lo 每年 {code} 持股數變化")
+            ax.set_xlabel("年份")
             ax.set_ylabel("持股數")
             ax.set_ylim(0, 15000)
-
-            # x軸只顯示每3個月一格，避免擁擠
-            ax.set_xticks(ax.get_xticks()[::3])
-            ax.tick_params(axis='x', labelrotation=45)
-
+            ax.tick_params(axis='x', labelrotation=0)
             plt.tight_layout()
             st.pyplot(fig)
