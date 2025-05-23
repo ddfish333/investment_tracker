@@ -16,67 +16,89 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # --- 讀檔 ---
 df = pd.read_excel("data/transactions.xlsx")
-df = df[df["備註"].isin(["Lo", "Sean", "Sean/Lo"])]
 df["交易日期"] = pd.to_datetime(df["交易日期"])
 df["月份"] = df["交易日期"].dt.to_period("M")
-df["股票代號"] = df["股票代號"].astype(str)
+df["來源"] = df["備註"].fillna("其他")
+df["幣別"] = df["幣別"].fillna("TWD")
 
-# 所有代號與月份
-all_codes = sorted(df["股票代號"].dropna().unique())
+# 整理代號與月份
+all_codes = sorted(df["股票代號"].dropna().unique(), key=lambda x: str(x))
 all_months = pd.period_range(df["月份"].min(), df["月份"].max(), freq="M")
 
-# 初始化資料結構：每個來源一份表
-holdings_by_label = {"Lo": {}, "Sean": {}, "Sean/Lo": {}}
-for label in holdings_by_label:
-    holdings_by_label[label]["df"] = pd.DataFrame(index=all_months, columns=all_codes).fillna(0)
-    holdings_by_label[label]["current"] = {code: 0 for code in all_codes}
+# 初始化三種來源的表格與持股追蹤
+def initialize_holdings():
+    return pd.DataFrame(index=all_months, columns=all_codes).fillna(0), {code: 0 for code in all_codes}
+
+monthly_Lo, current_Lo = initialize_holdings()
+monthly_Sean, current_Sean = initialize_holdings()
+monthly_SeanLo, current_SeanLo = initialize_holdings()
 
 # FIFO 累積
 for month in all_months:
     rows = df[df["月份"] == month]
     for _, row in rows.iterrows():
-        label = row["備註"]
         code = row["股票代號"]
         qty = int(row["買賣股數"])
-        holdings_by_label[label]["current"][code] += qty
-    for label in holdings_by_label:
-        for code in all_codes:
-            holdings_by_label[label]["df"].at[month, code] = holdings_by_label[label]["current"][code]
+        source = row["來源"]
+        if source == "Lo":
+            current_Lo[code] += qty
+        elif source == "Sean":
+            current_Sean[code] += qty
+        elif source == "Sean/Lo":
+            current_SeanLo[code] += qty
 
-# 將 index 轉 timestamp
-for label in holdings_by_label:
-    holdings_by_label[label]["df"].index = holdings_by_label[label]["df"].index.to_timestamp()
+    for code in all_codes:
+        monthly_Lo.at[month, code] = current_Lo[code]
+        monthly_Sean.at[month, code] = current_Sean[code]
+        monthly_SeanLo.at[month, code] = current_SeanLo[code]
 
-# 依照三個來源加總後，找出最高總持股做為 Y 軸最大值
-total_stack = sum(holdings_by_label[label]["df"] for label in holdings_by_label)
-max_y = total_stack.max().max() * 1.1
+# datetime index for plotting
+monthly_Lo.index = monthly_Lo.index.to_timestamp()
+monthly_Sean.index = monthly_Sean.index.to_timestamp()
+monthly_SeanLo.index = monthly_SeanLo.index.to_timestamp()
 
-# 根據最新月份持股數總和做排序（從高到低）
-latest = total_stack.iloc[-1].sort_values(ascending=False)
-sorted_codes = latest.index.tolist()
+# 計算總持股做為排序依據與Y軸最大值計算（依照幣別區分）
+code_to_currency = df.groupby("股票代號")["幣別"].first().to_dict()
+code_total = {}
+twd_max, usd_max = 0, 0
+for code in all_codes:
+    total = (monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
+    code_total[code] = total
+    if code_to_currency.get(code, "TWD") == "USD":
+        usd_max = max(usd_max, total)
+    else:
+        twd_max = max(twd_max, total)
+
+# 持股多的放前面
+sorted_codes = sorted(all_codes, key=lambda c: code_total[c], reverse=True)
 
 # --- Streamlit Layout ---
 st.set_page_config(layout="wide")
 st.title("📊 Lo 每月持股變化")
 
-# 每4張一列
 chunk_size = 4
 chunks = [sorted_codes[i:i+chunk_size] for i in range(0, len(sorted_codes), chunk_size)]
 
 for chunk in chunks:
-    cols = st.columns(len(chunk))
+    cols = st.columns(2)
     for i, code in enumerate(chunk):
-        with cols[i]:
-            fig, ax = plt.subplots(figsize=(6, 4))
-            bottom = pd.Series([0] * len(holdings_by_label["Lo"]["df"].index), index=holdings_by_label["Lo"]["df"].index)
-            for label, color in zip(["Lo", "Sean", "Sean/Lo"], ['#76c7c0', '#3a7ca5', '#1f4e79']):
-                values = holdings_by_label[label]["df"][code].astype(float)
-                ax.bar(values.index, values, bottom=bottom, label=label, color=color, width=20)
-                bottom += values
-            ax.set_title(f"{code} 持股數變化")
+        with cols[i % 2]:
+            fig, ax = plt.subplots(figsize=(8, 4))
+            ax.bar(monthly_Lo.index, monthly_Lo[code], color='#87CEEB', label='Lo', width=20)
+            ax.bar(monthly_Sean.index, monthly_Sean[code], color='#4682B4', label='Sean', bottom=monthly_Lo[code], width=20)
+            ax.bar(monthly_SeanLo.index, monthly_SeanLo[code], color='#1E3F66', label='Sean/Lo',
+                   bottom=monthly_Lo[code] + monthly_Sean[code], width=20)
+
+            ax.set_title(f"{code} 持股數量變化")
             ax.set_xlabel("月")
-            ax.set_ylabel("股數")
-            ax.set_ylim(0, max_y)
+            ax.set_ylabel("持股")
             ax.legend()
-            plt.xticks(rotation=30)
+            
+            if code_to_currency.get(code, "TWD") == "USD":
+                ax.set_ylim(0, usd_max * 1.1)
+            else:
+                ax.set_ylim(0, twd_max * 1.1)
+
+            plt.xticks(rotation=45)
+            plt.tight_layout()
             st.pyplot(fig)
