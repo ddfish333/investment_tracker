@@ -7,7 +7,7 @@ plt.rcParams['font.family'] = 'AppleGothic'
 plt.rcParams['axes.unicode_minus'] = False
 
 # 讀檔
-df = pd.read_excel("transactions.xlsx")
+df = pd.read_excel("data/transactions.xlsx")
 df = df[df["備註"] == "Lo"]
 df["交易日期"] = pd.to_datetime(df["交易日期"])
 df["月份"] = df["交易日期"].dt.to_period("M")
