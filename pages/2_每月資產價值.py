@@ -17,7 +17,7 @@ else:
     plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['axes.unicode_minus'] = False
 
-# 解析並計算每月資產價值
+# 解析每月持股並計算資產價值
 monthly_holding_dict = parse_monthly_holdings("data/transactions.xlsx")
 combined_df = calculate_monthly_asset_value("data/transactions.xlsx")
 
@@ -25,5 +25,4 @@ combined_df = calculate_monthly_asset_value("data/transactions.xlsx")
 st.set_page_config(layout="wide")
 st.title("💰 每月資產價值（以台幣計價）")
 
-# 顯示折線圖
 st.line_chart(combined_df)
