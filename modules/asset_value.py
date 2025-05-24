@@ -10,6 +10,7 @@ def calculate_monthly_asset_value(transaction_path):
     valid_codes = set()
     for df in monthly_holdings.values():
         valid_codes.update(df.loc[:, (df != 0).any()].columns)
+    print("valid_codes =", valid_codes)
     all_codes = sorted(valid_codes)
 
     # 取得月末股價與匯率
