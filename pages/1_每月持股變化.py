@@ -29,7 +29,7 @@ plt.rcParams['legend.facecolor'] = '#0E1117'
 monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, raw_df, color_map = parse_monthly_holdings("data/transactions.xlsx")
 
 st.set_page_config(layout="wide")
-st.title("📊 每月持股變化總覽（疊加直方圖）")
+st.title("Sean&Lo每月持股變化")
 
 # 顏色定義
 color_dict = {
@@ -53,9 +53,18 @@ def is_all_zero(code):
 def is_us_stock(code):
     return str(code).endswith("US")
 
-# 計算最大值上限
-max_tw = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if not is_us_stock(str(code))) * 1.1
-max_us = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if is_us_stock(str(code))) * 1.1
+# 計算最大值上限，避免 ValueError
+max_tw = max(
+    ((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
+     for code in all_codes if not is_us_stock(str(code))),
+    default=0
+) * 1.1
+
+max_us = max(
+    ((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
+     for code in all_codes if is_us_stock(str(code))),
+    default=0
+) * 1.1
 
 # 顯示所有股票的每月持股變化（以股票代號為單位）
 cols = st.columns(2)
