@@ -52,6 +52,8 @@ def is_all_zero(code):
     )
 
 def is_us_stock(code):
+    """判斷是否為美股代碼，統一轉大寫後比對"""
+    return str(code).upper().endswith("US")(code):
     return str(code).endswith("US")
 
 # 計算台股與美股 Y 軸最大值
@@ -64,7 +66,7 @@ max_us = max(
     for code in all_codes if is_us_stock(code)
 ) * 1.1 if any(is_us_stock(code) for code in all_codes) else 0
 
-# 按目前持股（最後月份持股總和）排序，持股多者排前
+# 按目前持股（最後月份持股總和）排序，持股多者排前（最後月份持股總和）排序，持股多者排前
 all_codes_sorted = sorted(
     all_codes,
     key=lambda c: (
