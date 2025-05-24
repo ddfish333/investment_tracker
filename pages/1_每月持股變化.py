@@ -14,6 +14,17 @@ else:
     plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['axes.unicode_minus'] = False
 
+# 顏色與背景設置
+plt.style.use("dark_background")
+plt.rcParams['axes.facecolor'] = '#0E1117'
+plt.rcParams['figure.facecolor'] = '#0E1117'
+plt.rcParams['axes.edgecolor'] = 'white'
+plt.rcParams['xtick.color'] = 'white'
+plt.rcParams['ytick.color'] = 'white'
+plt.rcParams['text.color'] = 'white'
+plt.rcParams['axes.labelcolor'] = 'white'
+plt.rcParams['legend.facecolor'] = '#0E1117'
+
 # 載入交易資料
 monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, raw_df, color_map = parse_monthly_holdings("data/transactions.xlsx")
 
@@ -39,11 +50,18 @@ def is_all_zero(code):
         monthly_SeanLo[code].sum() == 0
     )
 
+def is_us_stock(code):
+    return code.endswith("US")
+
+# 計算最大值上限
+max_tw = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if not is_us_stock(code)) * 1.1
+max_us = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if is_us_stock(code)) * 1.1
+
 # 顯示所有股票的每月持股變化（以股票代號為單位）
 cols = st.columns(2)
 for idx, code in enumerate(all_codes):
     with cols[idx % 2]:
-        fig, ax = plt.subplots(figsize=(5, 2.5))
+        fig, ax = plt.subplots(figsize=(4.8, 2.2))
 
         zero_holding = is_all_zero(code)
         palette = gray_dict if zero_holding else color_dict
@@ -69,6 +87,7 @@ for idx, code in enumerate(all_codes):
         ax.set_title(f"{code} 持股變化圖", fontsize=10)
         ax.tick_params(axis='x', labelrotation=45, labelsize=8)
         ax.tick_params(axis='y', labelsize=8)
+        ax.set_ylim(0, max_us if is_us_stock(code) else max_tw)
         ax.legend(fontsize=7)
         plt.tight_layout()
         st.pyplot(fig)
