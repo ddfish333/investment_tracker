@@ -26,34 +26,34 @@ color_dict = {
     "Sean": "#4682B4",
     "Sean/Lo": "#1E3F66",
 }
+gray_dict = {
+    "Lo": "#D3D3D3",
+    "Sean": "#A9A9A9",
+    "Sean/Lo": "#696969",
+}
 
 def is_all_zero(code):
-    return (monthly_Lo[code].sum() + monthly_Sean[code].sum() + monthly_SeanLo[code].sum()) == 0
+    return (
+        monthly_Lo[code].sum() == 0 and
+        monthly_Sean[code].sum() == 0 and
+        monthly_SeanLo[code].sum() == 0
+    )
 
 # 顯示所有股票的每月持股變化（以股票代號為單位）
-for code in all_codes:
-    fig, ax = plt.subplots(figsize=(6, 3))
+cols = st.columns(2)
+for idx, code in enumerate(all_codes):
+    with cols[idx % 2]:
+        fig, ax = plt.subplots(figsize=(5, 2.5))
 
-    zero_holding = is_all_zero(code)
+        zero_holding = is_all_zero(code)
+        palette = gray_dict if zero_holding else color_dict
 
-    if zero_holding:
-        ax.bar(monthly_Lo.index, monthly_Lo[code], color="#D3D3D3", label="Lo", width=20)
-        ax.bar(monthly_Sean.index, monthly_Sean[code], bottom=monthly_Lo[code], color="#A9A9A9", label="Sean", width=20)
-        ax.bar(
-            monthly_SeanLo.index,
-            monthly_SeanLo[code],
-            bottom=monthly_Lo[code] + monthly_Sean[code],
-            color="#696969",
-            label="Sean/Lo",
-            width=20,
-        )
-    else:
-        ax.bar(monthly_Lo.index, monthly_Lo[code], color=color_dict["Lo"], label="Lo", width=20)
+        ax.bar(monthly_Lo.index, monthly_Lo[code], color=palette["Lo"], label="Lo", width=20)
         ax.bar(
             monthly_Sean.index,
             monthly_Sean[code],
             bottom=monthly_Lo[code],
-            color=color_dict["Sean"],
+            color=palette["Sean"],
             label="Sean",
             width=20,
         )
@@ -61,11 +61,14 @@ for code in all_codes:
             monthly_SeanLo.index,
             monthly_SeanLo[code],
             bottom=monthly_Lo[code] + monthly_Sean[code],
-            color=color_dict["Sean/Lo"],
+            color=palette["Sean/Lo"],
             label="Sean/Lo",
             width=20,
         )
 
-    ax.set_title(f"{code} 持股變化圖")
-    ax.legend()
-    st.pyplot(fig)
+        ax.set_title(f"{code} 持股變化圖", fontsize=10)
+        ax.tick_params(axis='x', labelrotation=45, labelsize=8)
+        ax.tick_params(axis='y', labelsize=8)
+        ax.legend(fontsize=7)
+        plt.tight_layout()
+        st.pyplot(fig)
