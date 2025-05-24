@@ -5,7 +5,6 @@ from modules.holding_parser import parse_monthly_holdings
 def calculate_monthly_asset_value(transaction_path):
     monthly_holdings = parse_monthly_holdings(transaction_path)
     all_months = next(iter(monthly_holdings.values())).index
-
     # 過濾出實際有持股的代號（排除所有都為0的）
     valid_codes = set()
 for df in monthly_holdings.values():
