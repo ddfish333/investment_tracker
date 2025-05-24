@@ -20,7 +20,8 @@ plt.rcParams['axes.unicode_minus'] = False
 monthly_holding_dict = parse_monthly_holdings("data/transactions.xlsx")
 
 # 合併持股為 Sean、Lo 各自資產
-combined_df = calculate_monthly_asset_value(monthly_holding_dict)
+combined_df = calculate_monthly_asset_value("data/transactions.xlsx")
+
 
 # --- Streamlit Layout ---
 st.set_page_config(layout="wide")
