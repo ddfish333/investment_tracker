@@ -5,9 +5,7 @@ import matplotlib.font_manager as fm
 import os
 from modules.holding_parser import parse_monthly_holdings
 
-# ---------------------------
-# Step 1: 設定中文字體
-# ---------------------------
+# 設定中文字體
 font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
 if os.path.exists(font_path):
     prop = fm.FontProperties(fname=font_path)
@@ -16,63 +14,50 @@ else:
     plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['axes.unicode_minus'] = False
 
-# ---------------------------
-# Step 2: 讀取持股資料（dict: {"Lo": df, "Sean": df, "Sean/Lo": df}）
-# ---------------------------
-monthly_holding_dict = parse_monthly_holdings("data/transactions.xlsx")
+# 讀取資料與解析持股
+monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, df = parse_monthly_holdings("data/transactions.xlsx")
 
-# Debug: 顯示所有來源與 shape
-st.write("✅ DEBUG: monthly_holding_dict keys:", list(monthly_holding_dict.keys()))
-for label, df in monthly_holding_dict.items():
-    st.write(f"📄 {label} dataframe shape: {df.shape}")
-    st.write(df.head())
+# 計算總持股與排序依據（依股票代號的總持股數量排序）
+code_to_currency = df.groupby("股票代號")["幣別"].first().to_dict()
+code_total = {}
+twd_max, usd_max = 0, 0
+for code in all_codes:
+    total = (monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
+    code_total[code] = total
+    if code_to_currency.get(code, "TWD") == "USD":
+        usd_max = max(usd_max, total)
+    else:
+        twd_max = max(twd_max, total)
 
-# ---------------------------
-# Step 3: Streamlit Layout 設定
-# ---------------------------
+# 股票依總持股排序
+sorted_codes = sorted(all_codes, key=lambda c: code_total[c], reverse=True)
+
+# Streamlit Layout
 st.set_page_config(layout="wide")
 st.title("📊 每月持股變化總覽（疊加直方圖）")
 
-# ---------------------------
-# Step 4: 安全整理所有股票代碼
-# ---------------------------
-if monthly_holding_dict:
-    all_codes = sorted(set().union(*[
-        df.columns for df in monthly_holding_dict.values() if not df.empty
-    ]))
-else:
-    st.warning("⚠️ 無法載入任何持股資料，請確認檔案內容")
-    st.stop()
-
-# ---------------------------
-# Step 5: 統一 Y 軸上限（加總後最大值 * 1.1）
-# ---------------------------
-combined_sum = sum([df.fillna(0) for df in monthly_holding_dict.values()])
-y_max = combined_sum.max().max() * 1.1
-
-# ---------------------------
-# Step 6: 分批顯示持股圖（每 4 張圖）
-# ---------------------------
 chunk_size = 4
-chunks = [all_codes[i:i + chunk_size] for i in range(0, len(all_codes), chunk_size)]
+chunks = [sorted_codes[i:i+chunk_size] for i in range(0, len(sorted_codes), chunk_size)]
 
 for chunk in chunks:
     cols = st.columns(2)
     for i, code in enumerate(chunk):
         with cols[i % 2]:
             fig, ax = plt.subplots(figsize=(8, 4))
-            bottom = None
-            for label, df in monthly_holding_dict.items():
-                if code in df.columns:
-                    data = df[code].fillna(0)
-                    ax.bar(df.index, data, label=label, bottom=bottom, width=25)
-                    bottom = data if bottom is None else bottom + data
+            ax.bar(monthly_Lo.index, monthly_Lo[code], color='#87CEEB', label='Lo', width=20)
+            ax.bar(monthly_Sean.index, monthly_Sean[code], color='#4682B4', label='Sean', bottom=monthly_Lo[code], width=20)
+            ax.bar(monthly_SeanLo.index, monthly_SeanLo[code], color='#1E3F66', label='Sean/Lo',
+                   bottom=monthly_Lo[code] + monthly_Sean[code], width=20)
 
             ax.set_title(f"{code} 每月持股數量")
             ax.set_xlabel("月")
             ax.set_ylabel("股數")
-            ax.set_ylim(0, y_max)
-            ax.tick_params(axis='x', labelrotation=30)
             ax.legend()
+            if code_to_currency.get(code, "TWD") == "USD":
+                ax.set_ylim(0, usd_max * 1.1)
+            else:
+                ax.set_ylim(0, twd_max * 1.1)
+
+            ax.tick_params(axis='x', labelrotation=30)
             plt.tight_layout()
             st.pyplot(fig)
