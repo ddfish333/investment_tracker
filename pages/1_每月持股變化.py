@@ -26,10 +26,11 @@ plt.rcParams['axes.labelcolor'] = 'white'
 plt.rcParams['legend.facecolor'] = '#0E1117'
 
 # 載入交易資料
-monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, raw_df, color_map = parse_monthly_holdings("data/transactions.xlsx")
+monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, raw_df, color_map = \
+    parse_monthly_holdings("data/transactions.xlsx")
 
 st.set_page_config(layout="wide")
-st.title("\U0001F4C8 Sean&Lo每月持股變化")
+st.title("Sean&Lo 每月持股變化")
 
 # 顏色定義
 color_dict = {
@@ -53,31 +54,30 @@ def is_all_zero(code):
 def is_us_stock(code):
     return str(code).endswith("US")
 
-# 計算最大值上限（避免 ValueError）
+# 計算台股與美股 Y 軸最大值
 max_tw = max(
-    ((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
-     for code in all_codes if not is_us_stock(code)),
-    default=0
-) * 1.1
-
+    (monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
+    for code in all_codes if not is_us_stock(code)
+) * 1.1 if any(not is_us_stock(code) for code in all_codes) else 0
 max_us = max(
-    ((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
-     for code in all_codes if is_us_stock(code)),
-    default=0
-) * 1.1
+    (monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
+    for code in all_codes if is_us_stock(code)
+) * 1.1 if any(is_us_stock(code) for code in all_codes) else 0
 
-# 排序：將持股不為零的排前面，並根據持股總數排序
-sorted_codes = sorted(
+# 按目前持股（最後月份持股總和）排序，持股多者排前
+all_codes_sorted = sorted(
     all_codes,
-    key=lambda code: (is_all_zero(code), -(monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).iloc[-1])
+    key=lambda c: (
+        monthly_Lo[c].iloc[-1] + monthly_Sean[c].iloc[-1] + monthly_SeanLo[c].iloc[-1]
+    ),
+    reverse=True
 )
 
-# 顯示所有股票的每月持股變化
+# 顯示圖表
 cols = st.columns(2)
-for idx, code in enumerate(sorted_codes):
+for idx, code in enumerate(all_codes_sorted):
     with cols[idx % 2]:
         fig, ax = plt.subplots(figsize=(4.8, 2.2))
-
         zero_holding = is_all_zero(code)
         palette = gray_dict if zero_holding else color_dict
 
@@ -102,7 +102,9 @@ for idx, code in enumerate(sorted_codes):
         ax.set_title(f"{code} 持股變化圖", fontsize=10)
         ax.tick_params(axis='x', labelrotation=45, labelsize=8)
         ax.tick_params(axis='y', labelsize=8)
-        ax.set_ylim(0, max_us if is_us_stock(code) else max_tw)
+        # 設定 Y 軸上限
+        max_val = max_us if is_us_stock(code) else max_tw
+        ax.set_ylim(0, max_val)
         ax.legend(fontsize=7)
         plt.tight_layout()
         st.pyplot(fig)
