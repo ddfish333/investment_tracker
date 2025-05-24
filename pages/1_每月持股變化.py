@@ -30,7 +30,7 @@ monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, raw_df, color_m
     parse_monthly_holdings("data/transactions.xlsx")
 
 st.set_page_config(layout="wide")
-st.title("Sean&Lo 每月持股變化")
+st.title("Sean & Lo 每月持股變化")
 
 # 顏色定義
 color_dict = {
@@ -53,20 +53,19 @@ def is_all_zero(code):
 
 def is_us_stock(code):
     """判斷是否為美股代碼，統一轉大寫後比對"""
-    return str(code).upper().endswith("US")(code):
-    return str(code).endswith("US")
+    return str(code).upper().endswith("US")
 
 # 計算台股與美股 Y 軸最大值
 max_tw = max(
-    (monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
-    for code in all_codes if not is_us_stock(code)
-) * 1.1 if any(not is_us_stock(code) for code in all_codes) else 0
+    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
+    for c in all_codes if not is_us_stock(c)
+) * 1.1 if any(not is_us_stock(c) for c in all_codes) else 0
 max_us = max(
-    (monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max()
-    for code in all_codes if is_us_stock(code)
-) * 1.1 if any(is_us_stock(code) for code in all_codes) else 0
+    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
+    for c in all_codes if is_us_stock(c)
+) * 1.1 if any(is_us_stock(c) for c in all_codes) else 0
 
-# 按目前持股（最後月份持股總和）排序，持股多者排前（最後月份持股總和）排序，持股多者排前
+# 按目前持股（最後月份持股總和）排序，持股多者排前
 all_codes_sorted = sorted(
     all_codes,
     key=lambda c: (
