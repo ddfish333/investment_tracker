@@ -56,25 +56,25 @@ def is_current_zero(code):
     ) == 0
 
 def is_us_stock(code):
-    """判斷是否為美股代碼，統一轉大寫後比對"""
-    return str(code).upper().endswith("US")
+    """判斷是否為美股代碼，依原始交易標示欄位"""
+    try:
+        return raw_df.loc[raw_df['股票代號'] == code, '台股/美股'].iloc[0] == '美股'
+    except:
+        return str(code).upper().endswith("US")
 
 # 計算台股與美股 Y 軸最大值
-max_tw = 0
-tw_codes = [c for c in all_codes if not is_us_stock(c)]
-if tw_codes:
-    max_tw = max(
-        (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
-        for c in tw_codes
-    ) * 1.1
-
-max_us = 0
 us_codes = [c for c in all_codes if is_us_stock(c)]
-if us_codes:
-    max_us = max(
-        (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
-        for c in us_codes
-    ) * 1.1
+tw_codes = [c for c in all_codes if not is_us_stock(c)]
+
+max_tw = max(
+    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
+    for c in tw_codes
+) * 1.1 if tw_codes else 0
+
+max_us = max(
+    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
+    for c in us_codes
+) * 1.1 if us_codes else 0
 
 # 按最後月份持股大小排序（大到小）
 all_codes_sorted = sorted(
