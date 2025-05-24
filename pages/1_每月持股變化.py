@@ -51,11 +51,11 @@ def is_all_zero(code):
     )
 
 def is_us_stock(code):
-    return code.endswith("US")
+    return str(code).endswith("US")
 
 # 計算最大值上限
-max_tw = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if not is_us_stock(code)) * 1.1
-max_us = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if is_us_stock(code)) * 1.1
+max_tw = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if not is_us_stock(str(code))) * 1.1
+max_us = max((monthly_Lo[code] + monthly_Sean[code] + monthly_SeanLo[code]).max() for code in all_codes if is_us_stock(str(code))) * 1.1
 
 # 顯示所有股票的每月持股變化（以股票代號為單位）
 cols = st.columns(2)
@@ -87,7 +87,7 @@ for idx, code in enumerate(all_codes):
         ax.set_title(f"{code} 持股變化圖", fontsize=10)
         ax.tick_params(axis='x', labelrotation=45, labelsize=8)
         ax.tick_params(axis='y', labelsize=8)
-        ax.set_ylim(0, max_us if is_us_stock(code) else max_tw)
+        ax.set_ylim(0, max_us if is_us_stock(str(code)) else max_tw)
         ax.legend(fontsize=7)
         plt.tight_layout()
         st.pyplot(fig)
