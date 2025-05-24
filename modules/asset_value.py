@@ -14,7 +14,7 @@ def calculate_monthly_asset_value(transaction_path):
 
     # 取得月末股價與匯率
     price_df = fetch_month_end_prices(all_codes, all_months)
-    fx_series = fetch_month_end_fx(all_months)  # 這裡用 series 來表示匯率資料
+    fx_series = fetch_month_end_fx(all_months)  # 匯率 Series（index 為月份）
 
     # 初始化資產表
     result = pd.DataFrame(index=all_months, columns=["Sean", "Lo"]).fillna(0)
@@ -24,11 +24,11 @@ def calculate_monthly_asset_value(transaction_path):
             total = 0
             for code in df.columns:
                 shares = df.at[month, code]
-                if code not in price_df.columns:
-                    continue
+                if code not in price_df.columns or month not in price_df.index:
+                    continue  # 該股票或該月份沒有價格資料則跳過
                 price = price_df.at[month, code]
                 currency = "USD" if code.endswith("US") else "TWD"
-                fx = fx_series.at[month] if currency == "USD" else 1
+                fx = fx_series.at[month] if currency == "USD" and month in fx_series.index else 1
                 total += shares * price * fx
 
             if owner == "Sean":
