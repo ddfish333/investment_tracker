@@ -37,4 +37,9 @@ def parse_monthly_holdings(filepath):
             monthly_Sean.at[month, code] = current_Sean[code]
             monthly_SeanLo.at[month, code] = current_SeanLo[code]
 
-    return monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, df
+    # 新增：將 index 轉為 timestamp，供繪圖使用
+    monthly_Lo.index = monthly_Lo.index.to_timestamp()
+    monthly_Sean.index = monthly_Sean.index.to_timestamp()
+    monthly_SeanLo.index = monthly_SeanLo.index.to_timestamp()
+
+    return monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, monthly_Lo.index, df
