@@ -5,7 +5,6 @@ import matplotlib.font_manager as fm
 import os
 from modules.holding_parser import parse_monthly_holdings
 from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
-from modules.asset_value import calculate_monthly_asset_value
 
 # 設定中文字體
 font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
