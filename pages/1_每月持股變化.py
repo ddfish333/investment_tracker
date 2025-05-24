@@ -44,32 +44,45 @@ gray_dict = {
     "Sean/Lo": "#696969",
 }
 
-def is_all_zero(code):
+def is_current_zero(code):
+    """
+    判斷最後一個月份持股是否為零
+    """
+    last = all_months[-1]
     return (
-        monthly_Lo[code].sum() == 0 and
-        monthly_Sean[code].sum() == 0 and
-        monthly_SeanLo[code].sum() == 0
-    )
+        monthly_Lo.at[last, code] +
+        monthly_Sean.at[last, code] +
+        monthly_SeanLo.at[last, code]
+    ) == 0
 
 def is_us_stock(code):
     """判斷是否為美股代碼，統一轉大寫後比對"""
     return str(code).upper().endswith("US")
 
 # 計算台股與美股 Y 軸最大值
-max_tw = max(
-    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
-    for c in all_codes if not is_us_stock(c)
-) * 1.1 if any(not is_us_stock(c) for c in all_codes) else 0
-max_us = max(
-    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
-    for c in all_codes if is_us_stock(c)
-) * 1.1 if any(is_us_stock(c) for c in all_codes) else 0
+max_tw = 0
+tw_codes = [c for c in all_codes if not is_us_stock(c)]
+if tw_codes:
+    max_tw = max(
+        (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
+        for c in tw_codes
+    ) * 1.1
 
-# 按目前持股（最後月份持股總和）排序，持股多者排前
+max_us = 0
+us_codes = [c for c in all_codes if is_us_stock(c)]
+if us_codes:
+    max_us = max(
+        (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
+        for c in us_codes
+    ) * 1.1
+
+# 按最後月份持股大小排序（大到小）
 all_codes_sorted = sorted(
     all_codes,
     key=lambda c: (
-        monthly_Lo[c].iloc[-1] + monthly_Sean[c].iloc[-1] + monthly_SeanLo[c].iloc[-1]
+        monthly_Lo[c].iloc[-1] +
+        monthly_Sean[c].iloc[-1] +
+        monthly_SeanLo[c].iloc[-1]
     ),
     reverse=True
 )
@@ -79,8 +92,8 @@ cols = st.columns(2)
 for idx, code in enumerate(all_codes_sorted):
     with cols[idx % 2]:
         fig, ax = plt.subplots(figsize=(4.8, 2.2))
-        zero_holding = is_all_zero(code)
-        palette = gray_dict if zero_holding else color_dict
+        current_zero = is_current_zero(code)
+        palette = gray_dict if current_zero else color_dict
 
         ax.bar(monthly_Lo.index, monthly_Lo[code], color=palette["Lo"], label="Lo", width=20)
         ax.bar(
