@@ -30,5 +30,5 @@ st.line_chart(summary_df)
 st.subheader("個股資產明細")
 for code in detail_df.columns.levels[0]:
     st.markdown(f"### {code} 資產走勢")
-    df_code = detail_df[code].rename(columns={'Joint': 'Sean/Lo'})
+    df_code = detail_df[code]
     st.line_chart(df_code)
