@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 
 st.set_page_config(layout="wide")
@@ -12,5 +13,6 @@ st.markdown("""
 ### 可用功能：
 - 每月持股變化（疊加直方圖）
 - 每月資產價值（台幣換算）
+- 每月股票價格查詢（2330 & TSLA 範例）
 - 年度損益分析（開發中）
 """)
