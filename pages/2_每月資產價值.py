@@ -5,7 +5,7 @@ import matplotlib.font_manager as fm
 from modules.asset_value import calculate_monthly_asset_value
 
 # --- Streamlit Page Setup ---
-st.set_page_config(page_title="\u6bcf\u6708\u8cc7\u7522\u50f9\u503c", layout="wide")
+st.set_page_config(page_title=u"\u6bcf\u6708\u8cc7\u7522\u50f9\u503c", layout="wide")
 st.title("\ud83d\udcb0 \u6bcf\u6708\u8cc7\u7522\u660e\u7d30 (\u4ee5\u53f0\u5e63\u8a08\u50f9)")
 
 # --- Font Setup ---
