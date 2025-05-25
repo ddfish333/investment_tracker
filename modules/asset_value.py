@@ -1,44 +1,41 @@
 # modules/asset_value.py
+```python
 import pandas as pd
 from modules.holding_parser import parse_monthly_holdings
 from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
 
 
-def is_us_stock(code):
-    return str(code).upper().endswith("US")
-
-
 def calculate_monthly_asset_value(transaction_path):
-    """
-    計算每月各人 (Lo/Sean) 與總計的資產價值 (TWD)
-    返回 summary_df (Lo, Sean, Total) 與 detail_df (Owner × Code)
-    """
     # 解析每月持股
-    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, _, _ = parse_monthly_holdings(transaction_path)
-
-    # 抓取行情與匯率
+    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months = parse_monthly_holdings(transaction_path)
+    # 拿到股價、匯率
     price_df = fetch_month_end_prices(all_codes, all_months)
     fx = fetch_month_end_fx(all_months)
 
-    # 美股價格換算台幣
-    us_codes = [c for c in all_codes if is_us_stock(c)]
-    if us_codes:
-        price_df[us_codes] = price_df[us_codes].multiply(fx, axis=0)
+    # 計算各持有者、各股票月末資產 = 持股數 * 股價 * 匯率(若為美股)
+    detail = {}
+    for owner, df in [('Lo', monthly_Lo), ('Sean', monthly_Sean)]:
+        df_val = df.multiply(price_df).copy()
+        # 美股轉匯
+        us_mask = [c.endswith('US') for c in df.columns]
+        df_val.loc[:, us_mask] = df_val.loc[:, us_mask].multiply(fx, axis=0)
+        detail[owner] = df_val
+    # 共同持股各拆一半
+    df_joint = monthly_SeanLo.multiply(price_df)
+    df_joint.loc[:, [c.endswith('US') for c in df_joint.columns]] = \
+        df_joint.loc[:, [c.endswith('US') for c in df_joint.columns]].multiply(fx, axis=0)
+    df_joint = df_joint.divide(2)
+    detail['Sean/Lo'] = df_joint
 
-    # 計算資產：Own + Joint/2
-    asset_Lo = (monthly_Lo * price_df).add(monthly_SeanLo * price_df / 2, fill_value=0)
-    asset_Sean = (monthly_Sean * price_df).add(monthly_SeanLo * price_df / 2, fill_value=0)
+    # 彙總每月各者總資產
+    summary = pd.DataFrame(index=all_months)
+    for owner in ['Lo', 'Sean', 'Sean/Lo']:
+        summary[owner] = detail[owner].sum(axis=1)
+    # 總和列出 Lo + Sean + Sean/Lo
+    summary['Total'] = summary['Lo'] + summary['Sean'] + summary['Sean/Lo']
 
-    # Detail: 每檔股票每月 Lo/Sean 資產
-    detail_df = pd.concat({'Lo': asset_Lo, 'Sean': asset_Sean}, axis=1)
-    detail_df.columns.names = ['Owner', 'Code']
-
-    # Summary: 各人與總資產
-    summary_df = pd.DataFrame({
-        'Lo': detail_df.xs('Lo', level='Owner', axis=1).sum(axis=1),
-        'Sean': detail_df.xs('Sean', level='Owner', axis=1).sum(axis=1)
-    })
-    summary_df['Total'] = summary_df['Lo'] + summary_df['Sean']
-
-    return summary_df, detail_df
-
+    # 合併 detail 多層 index: level0 Owner, level1 Code
+    detail_df = pd.concat(detail, axis=1)
+    # 回傳 summary_df, detail_df
+    return summary, detail_df
+```

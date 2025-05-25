@@ -1,26 +1,24 @@
 # modules/price_fetcher.py
+```python
 import pandas as pd
 
 
 def fetch_month_end_prices(codes, months):
     """
-    模擬或抓取歷史每月股票收盤價（預設為100.0，可替換為 API 調用）
-    返回 DataFrame：index 為 months，columns 為 codes
+    擷取指定股票在每月最後一個交易日的收盤價。
+    目前採用模擬：所有股票回傳固定 100
+    日後可替換為實際 API 呼叫
     """
-    idx = pd.to_datetime(months)
-    price_df = pd.DataFrame(
-        {code: [100.0 for _ in idx] for code in codes},
-        index=idx
-    )
-    price_df.columns = codes
-    return price_df
+    df = pd.DataFrame({code: [100.0 for _ in months] for code in codes}, index=months)
+    # 重新 index，確保月份完整
+    return df.reindex(months).astype(float)
 
 
 def fetch_month_end_fx(months, base="USD", quote="TWD"):
     """
-    模擬或抓取歷史每月匯率（預設為30.0，可替換為 API）
-    返回 Series：index 為 months
+    擷取指定月份的匯率 (USD->TWD)
+    目前採用模擬：固定值 30
     """
-    idx = pd.to_datetime(months)
-    fx = pd.Series([30.0 for _ in idx], index=idx)
-    return fx
+    series = pd.Series([30.0 for _ in months], index=months)
+    return series.astype(float)
+```
