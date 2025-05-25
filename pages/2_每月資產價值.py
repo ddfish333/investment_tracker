@@ -5,7 +5,10 @@ import matplotlib.font_manager as fm
 from modules.asset_value import calculate_monthly_asset_value
 
 # --- Streamlit Page Setup ---
-st.set_page_config(page_title=u"每月資產價值", layout="wide")
+# 修改後（直接使用 utf-8 中文並明確指定 .py 檔案的編碼）
+# 在檔案上方加上 encoding declaration 表示 utf-8
+# -*- coding: utf-8 -*-
+st.set_page_config(page_title="每月資產價值", layout="wide")
 
 # 設定中文字體
 font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
