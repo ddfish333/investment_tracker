@@ -4,52 +4,43 @@ from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
 
 
 def calculate_monthly_asset_value(transaction_path):
-    """
-    計算 Sean、Lo 與總資產價值，並拆分 joint 持股到各自名下。
-    回傳：
-      - summary_df: pd.DataFrame(index=月份, columns=['Lo','Sean','Total'])
-      - detail_df: pd.DataFrame(columns=MultiIndex[(code, owner)])
-    """
     # 解析每月持股
-    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, _, _ = \
-        parse_monthly_holdings(transaction_path)
+    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, _, _ = parse_monthly_holdings(transaction_path)
 
-    # 取得價格與匯率
+    # 取得每月收盤價及匯率
     price_df = fetch_month_end_prices(all_codes, all_months)
-    fx_series = fetch_month_end_fx(all_months)
+    fx = fetch_month_end_fx(all_months)
 
-    # 初始化 summary
-    summary_df = pd.DataFrame(index=all_months, columns=['Lo', 'Sean']).fillna(0.0)
-
-    # detail: {code: DataFrame({'Lo':, 'Sean':})}
-    detail = {}
+    # 建立 detail DataFrame: 多層欄位 (code, owner)
+    detail_frames = []
     for code in all_codes:
-        price = price_df[code]
-        # 台股不換算匯率，美股需乘上匯率
-        fx = fx_series if str(code).endswith('US') else 1.0
+        # 判斷是否為美股
+        is_us = str(code).endswith("US")
+        rate = fx if is_us else 1.0
 
-        # 各自持股與 joint 持股平分
-        share_lo = monthly_Lo[code] + monthly_SeanLo[code] / 2.0
-        share_sean = monthly_Sean[code] + monthly_SeanLo[code] / 2.0
+        # 計算各自價值
+        v_lo = monthly_Lo[code] * price_df[code] * rate
+        v_sean = monthly_Sean[code] * price_df[code] * rate
+        v_joint = monthly_SeanLo[code] * price_df[code] * rate
 
-        # 計算價值
-        val_lo = share_lo * price * fx
-        val_sean = share_sean * price * fx
-
-        # 累加到 summary
-        summary_df['Lo'] += val_lo
-        summary_df['Sean'] += val_sean
-
-        # 個股明細
-        detail[code] = pd.DataFrame({
-            'Lo': val_lo,
-            'Sean': val_sean,
+        df = pd.DataFrame({
+            (code, 'Lo'): v_lo,
+            (code, 'Sean'): v_sean,
+            (code, 'Sean/Lo'): v_joint,
         }, index=all_months)
+        detail_frames.append(df)
 
-    # 總資產
-    summary_df['Total'] = summary_df['Lo'] + summary_df['Sean']
+    # 合併所有個股明細
+    detail_df = pd.concat(detail_frames, axis=1).sort_index(axis=1)
 
-    # 合併個股 detail
-    detail_df = pd.concat(detail, axis=1)
+    # 計算總表: 各月總資產
+    summary_df = pd.DataFrame(
+        {
+            'Lo': detail_df.xs('Lo', axis=1, level=1).sum(axis=1),
+            'Sean': detail_df.xs('Sean', axis=1, level=1).sum(axis=1),
+            'Sean/Lo': detail_df.xs('Sean/Lo', axis=1, level=1).sum(axis=1),
+        }
+    )
+    summary_df['Total'] = summary_df.sum(axis=1)
 
     return summary_df, detail_df
