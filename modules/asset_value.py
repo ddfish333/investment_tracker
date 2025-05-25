@@ -4,43 +4,36 @@ import pandas as pd
 from modules.holding_parser import parse_monthly_holdings
 from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
 
-
 def calculate_monthly_asset_value(transaction_path):
-    """
-    計算每月各持有人(Lo, Sean, Sean/Lo)及總資產價值。
-    回傳 summary_df (Lo, Sean, Sean/Lo, Total) 及 detail_df (多層 column)
-    """
-    # 解析持股，回傳 monthly_Lo, monthly_Sean, monthly_SeanLo, 所有代碼及月份
-    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months = parse_monthly_holdings(transaction_path)
+    # 解析每月持股：返回三個 DataFrame (Lo, Sean, 共享) 及 months, codes 清單
+    monthly_Lo, monthly_Sean, monthly_Joint, all_codes, all_months = parse_monthly_holdings(transaction_path)
 
-    # 取得股價與匯率
+    # 取得價格與匯率
     price_df = fetch_month_end_prices(all_codes, all_months)
-    fx_series = fetch_month_end_fx(all_months)
+    fx_ser = fetch_month_end_fx(all_months)
 
-    detail = {}
-    # 分別計算 Lo 與 Sean 權益
-    for owner, df in [('Lo', monthly_Lo), ('Sean', monthly_Sean)]:
-        val = df.multiply(price_df)
-        # 美股轉換匯率 (假設代碼以 'US' 結尾)
-        us = [col.endswith('US') for col in df.columns]
-        if any(us):
-            val.loc[:, us] = val.loc[:, us].multiply(fx_series, axis=0)
-        detail[owner] = val
+    # 計算各自資產 (USD 轉 TWD)
+    val_Lo = monthly_Lo.mul(price_df).mul(fx_ser, axis=0)
+    val_Sean = monthly_Sean.mul(price_df).mul(fx_ser, axis=0)
+    val_Joint = monthly_Joint.mul(price_df).mul(fx_ser, axis=0)
 
-    # 合資部分 (Sean/Lo) 平分
-    joint = monthly_SeanLo.multiply(price_df)
-    us = [col.endswith('US') for col in monthly_SeanLo.columns]
-    if any(us):
-        joint.loc[:, us] = joint.loc[:, us].multiply(fx_series, axis=0)
-    detail['Sean/Lo'] = joint.divide(2)
+    # 總覽 DataFrame
+    summary = pd.DataFrame({
+        'Lo': val_Lo.sum(axis=1),
+        'Sean': val_Sean.sum(axis=1),
+        'Total': (val_Lo + val_Sean + val_Joint).sum(axis=1)
+    })
 
-    # 組出 summary
-    summary_df = pd.DataFrame({owner: detail[owner].sum(axis=1) for owner in detail})
-    summary_df['Total'] = summary_df.sum(axis=1)
+    # 詳細 MultiIndex DataFrame (Code, Owner)
+    detail = pd.concat([
+        val_Lo.add_suffix('_Lo'),
+        val_Sean.add_suffix('_Sean'),
+        val_Joint.add_suffix('_Joint')
+    ], axis=1)
+    # 重整索引層級
+    detail.columns = pd.MultiIndex.from_tuples([
+        (col.split('_')[0], col.split('_')[1]) for col in detail.columns
+    ], names=['Code','Owner'])
 
-    # 組出 detail 多層 columns
-    detail_df = pd.concat(detail, axis=1)
-    detail_df.columns.names = ['Owner', 'Code']
-
-    return summary_df, detail_df
+    return summary, detail
 ```
