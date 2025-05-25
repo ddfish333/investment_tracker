@@ -3,10 +3,14 @@ from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
 from modules.holding_parser import parse_monthly_holdings
 
 def calculate_monthly_asset_value(transaction_path):
-    # 解析持股資料
-    monthly_holdings, *_ = parse_monthly_holdings(transaction_path)
-    all_codes = sorted(monthly_holdings.keys())
-    all_months = next(iter(monthly_holdings.values())).index
+    # 解析持股資料 (回傳 Lo, Sean, Joint 各自持股 DataFrame 以及所有代碼和月份)
+    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, *_ = parse_monthly_holdings(transaction_path)
+    # 建立 owner->持股表 的字典
+    monthly_holdings = {
+        'Lo': monthly_Lo,
+        'Sean': monthly_Sean,
+        'Joint': monthly_SeanLo,
+    }
 
     # 取得月末價格與匯率
     price_df = fetch_month_end_prices(all_codes, all_months)
@@ -31,10 +35,14 @@ def calculate_monthly_asset_value(transaction_path):
                     price *= fx_series.at[month]
                 value = shares * price
 
-                # 累加到 Summary
-                summary.at[month, owner] += value
+                # 累加到 Summary (Joint 對應分到兩人各半)
+                if owner == 'Joint':
+                    summary.at[month, 'Lo'] += value / 2
+                    summary.at[month, 'Sean'] += value / 2
+                else:
+                    summary.at[month, owner] += value
+
                 # 記錄到 Detail
-                col = owner if owner in ["Lo", "Sean"] else "Joint"
-                detail.at[month, (code, col)] = value
+                detail.at[month, (code, owner)] = value
 
     return summary, detail
