@@ -9,6 +9,8 @@ def get_monthly_stock_prices(codes, months):
     """
     # 取得原幣別月末收盤價
     price_df = fetch_month_end_prices(codes, months)
+    # 確保 DataFrame 索引為月份，欄位為代號
+    price_df = price_df.reindex(index=months, columns=codes)
     return price_df
 
 
@@ -16,19 +18,19 @@ def get_monthly_fx(months):
     """
     回傳指定月份的 USD→TWD 匯率
     """
-    return fetch_month_end_fx(months)
-
+    fx = fetch_month_end_fx(months)
+    return fx.reindex(months)
 
 # pages/4_每月股票價格.py
+import os
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import os
 from modules.holding_parser import parse_monthly_holdings
 from modules.stock_monthlyprice import get_monthly_stock_prices, get_monthly_fx
 
 # --- Streamlit Page: 每月股票價格查詢 ---
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="每月股票價格", layout="wide")
 
 # 設定中文字體
 font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
@@ -41,21 +43,24 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.title("📈 每月股票價格查詢 (2330 & TSLA)")
 
-# 從持股解析器取得完整月份索引
+# 取得所有月份索引
 _, _, _, all_codes, all_months, _, _ = parse_monthly_holdings("data/transactions.xlsx")
 
-# 選擇要查詢的股票代號
-selected = ["2330", "TSLA"]
-# 撈取各月收盤價 (原幣)
-price_df = get_monthly_stock_prices(selected, all_months)
-# 撈取各月匯率
-fx = get_monthly_fx(all_months)
+# 固定查詢列表，可改為 selectbox
+query_codes = ["2330", "TSLA"]
 
-# 將美股價格換算成台幣
+# 撈取收盤價與匯率
+price_df = get_monthly_stock_prices(query_codes, all_months)
+fx_series = get_monthly_fx(all_months)
+
+# 將美股價格換算為台幣
 if "TSLA" in price_df.columns:
-    price_df["TSLA (TWD)"] = price_df["TSLA"] * fx
+    price_df["TSLA_TWD"] = price_df["TSLA"] * fx_series
 
-# 繪製折線圖
-st.line_chart(
-    price_df.drop(columns=["TSLA"]) if "TSLA" in price_df.columns else price_df
-)
+# 顯示折線圖
+st.subheader("原幣別收盤價")
+st.line_chart(price_df[query_codes])
+
+if "TSLA_TWD" in price_df.columns:
+    st.subheader("TSLA 換算後之台幣價格")
+    st.line_chart(price_df[["TSLA_TWD"]])
