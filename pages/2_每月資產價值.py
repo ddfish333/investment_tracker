@@ -1,49 +1,54 @@
-import os
+# pages/2_\u6bcf\u6708\u8cc7\u7522\u50f9\u503c.py
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from modules.asset_value import calculate_monthly_asset_value
 
-# 1) Page setup
-st.set_page_config(page_title="每月資產價值", layout="wide")
+# --- Streamlit Page Setup ---
+st.set_page_config(page_title="\u6bcf\u6708\u8cc7\u7522\u50f9\u503c", layout="wide")
+st.title("\ud83d\udcb0 \u6bcf\u6708\u8cc7\u7522\u660e\u7d30 (\u4ee5\u53f0\u5e63\u8a08\u50f9)")
 
-# 2) 中文字體
+# --- Font Setup ---
 font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
-if os.path.exists(font_path):
+if font_path:
     prop = fm.FontProperties(fname=font_path)
-    plt.rcParams['font.family'] = prop.get_name()
-else:
-    plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams["font.family"] = prop.get_name()
+plt.rcParams["axes.unicode_minus"] = False
 
-# 3) 計算資產
+# --- Load Data & Calculate ---
 summary_df, detail_df = calculate_monthly_asset_value("data/transactions.xlsx")
-lo_curr = summary_df['Lo'].iloc[-1]
-sean_curr = summary_df['Sean'].iloc[-1]
 
-# 4) 標題
-st.title(f"💰 每月資產價值（台幣）Lo: {lo_curr:,.0f}元 | Sean: {sean_curr:,.0f}元")
+# --- Show Total Asset Trend ---
+st.subheader(f"\u7e3d\u8cc7\u7522\u8d70\u52e2: Lo vs Sean")
+st.line_chart(summary_df)
 
-# 5) 總資產走勢
-st.subheader("總資產走勢：Lo vs Sean")
-st.line_chart(summary_df[['Lo', 'Sean', 'Total']])
+# --- Show Each Stock Trend as Cards ---
+st.subheader("\u5404\u500b\u80a1\u7968\u8cc7\u7522\u8d70\u52e2\u660e\u7d30")
 
-# 6) 個股資產卡片式明細
-st.subheader("個股資產明細")
-codes = detail_df.columns.get_level_values('Code').unique()
-# 最後一期每股資產
-last_vals = {c: detail_df.xs(c, level='Code', axis=1).sum(axis=1).iloc[-1] for c in codes}
-# 排序：有持股->已售罄，並依資產大小
-sorted_codes = sorted(codes, key=lambda c: (last_vals[c] == 0, -last_vals[c]))
-cols = st.columns(3)
-for idx, code in enumerate(sorted_codes):
-    with cols[idx % 3]:
-        val = last_vals[code]
-        status = "(已售罄)" if val == 0 else f"({val:,.0f}元)"
-        st.markdown(f"#### {code} {status}")
-        df = detail_df.xs(code, level='Code', axis=1).copy()
-        df['Total'] = df.sum(axis=1)
-        if val == 0:
-            st.line_chart(df, use_container_width=True, color='#888888')
-        else:
-            st.line_chart(df, use_container_width=True)
+# 計算目前各持股最後月份的總價值，用於排序
+last_month = detail_df.index[-1]
+latest_values = detail_df.loc[last_month]
+total_per_stock = latest_values.groupby("Code").sum().sum(level=0)
+nonzero_stocks = total_per_stock[total_per_stock > 0].index.tolist()
+zero_stocks = total_per_stock[total_per_stock == 0].index.tolist()
+
+# 排序順序: 現有持股在前，已清倉的在後
+sorted_codes = nonzero_stocks + zero_stocks
+
+# 卡片式顯示每一個股票的走勢圖
+for code in sorted_codes:
+    sub_df = detail_df.xs(code, level="Code")
+    fig, ax = plt.subplots(figsize=(5, 3))
+    ax.plot(sub_df.index, sub_df["Lo"], label="Lo")
+    ax.plot(sub_df.index, sub_df["Sean"], label="Sean")
+    ax.plot(sub_df.index, sub_df["Sean/Lo"], label="Sean/Lo")
+    ax.set_title(f"{code} \u8cc7\u7522\u8d70\u52e2\u5716", fontsize=12)
+    ax.tick_params(labelsize=8)
+    ax.legend(fontsize=8)
+
+    if code in zero_stocks:
+        for line in ax.lines:
+            line.set_alpha(0.2)
+        ax.set_title(f"{code} \u5df2\u552e\u7a7a", fontsize=12, color="gray")
+
+    st.pyplot(fig)
