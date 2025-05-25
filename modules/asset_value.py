@@ -1,3 +1,4 @@
+# modules/asset_value.py
 import pandas as pd
 from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
 from modules.holding_parser import parse_monthly_holdings
@@ -5,17 +6,18 @@ from modules.holding_parser import parse_monthly_holdings
 def calculate_monthly_asset_value(transaction_path):
     monthly_holdings = parse_monthly_holdings(transaction_path)
     all_months = next(iter(monthly_holdings.values())).index
-    # 過濾出實際有持股的代號（排除所有都為0的）
+
+    # 过滤出实际有持股的代码（排除全月为0的）
     valid_codes = set()
-for df in monthly_holdings.values():
-    valid_codes.update(df.loc[:, (df != 0).any()].columns)
-all_codes = sorted(map(str, valid_codes))
+    for df in monthly_holdings.values():
+        valid_codes.update(df.loc[:, (df != 0).any()].columns)
+    all_codes = sorted(map(str, valid_codes))
 
-    # 取得月末股價與匯率
+    # 获取月末股价与汇率
     price_df = fetch_month_end_prices(all_codes, all_months)
-    fx_series = fetch_month_end_fx(all_months)  # 匯率 Series（index 為月份）
+    fx_df = fetch_month_end_fx(all_months)
 
-    # 初始化資產表
+    # 初始化资产表
     result = pd.DataFrame(index=all_months, columns=["Sean", "Lo"]).fillna(0)
 
     for month in all_months:
@@ -23,11 +25,9 @@ all_codes = sorted(map(str, valid_codes))
             total = 0
             for code in df.columns:
                 shares = df.at[month, code]
-                if code not in price_df.columns or month not in price_df.index:
-                    continue  # 該股票或該月份沒有價格資料則跳過
-                price = price_df.at[month, code]
+                price = price_df.at[month, code] if code in price_df.columns else 0
                 currency = "USD" if code.endswith("US") else "TWD"
-                fx = fx_series.at[month] if currency == "USD" and month in fx_series.index else 1
+                fx = fx_df.at[month, "USD/TWD"] if currency == "USD" else 1
                 total += shares * price * fx
 
             if owner == "Sean":
