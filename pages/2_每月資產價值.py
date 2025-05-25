@@ -1,8 +1,8 @@
 # pages/2_每月資產價值.py
 import streamlit as st
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import pandas as pd
 import os
 from modules.asset_value import calculate_monthly_asset_value
 
@@ -30,5 +30,5 @@ st.line_chart(summary_df)
 st.subheader("個股資產明細")
 for code in detail_df.columns.levels[0]:
     st.markdown(f"### {code} 資產走勢")
-    df_code = detail_df[code]
+    df_code = detail_df[code].rename(columns={'Joint': 'Sean/Lo'})
     st.line_chart(df_code)
