@@ -2,30 +2,15 @@ import pandas as pd
 
 def fetch_month_end_prices(codes, months):
     """
-    讀取本地歷史月末股價資料，並取出指定代號與月份
-    從 data/year_end_prices.xlsx 中讀取，每欄為一個股票代號，索引為月份
+    模擬歷史每月股票收盤價（固定為100，未連接API）
+    回傳一個 DataFrame：index=months, columns=codes，全部都是 float
     """
-    # 載入 Excel
-    price_df = pd.read_excel(
-        "data/year_end_prices.xlsx",
-        index_col=0,
-        parse_dates=True
-    )
-    # 篩選指定月份與代號
-    price_df = price_df.reindex(months).astype(float)
-    return price_df[codes]
+    # 建立完整的月份 × 代碼表格，並填入固定收盤價 100.0
+    price_df = pd.DataFrame(index=months, columns=codes)
+    return price_df.fillna(100.0)
 
-
-def fetch_month_end_fx(months, base="USD", quote="TWD"):  # noqa: F841
+def fetch_month_end_fx(months, base="USD", quote="TWD"):
     """
-    讀取本地歷史匯率資料（USD/TWD），並取出指定月份
-    從 data/fx_rates.csv 或 Excel 中讀取，索引為月份，值為匯率
+    模擬每月匯率（固定為30）
     """
-    # 載入 Excel 或 CSV
-    fx_df = pd.read_excel(
-        "data/fx_rates.xlsx",
-        index_col=0,
-        parse_dates=True
-    )
-    fx_series = fx_df["USD/TWD"].reindex(months).astype(float)
-    return fx_series
+    return pd.Series([30.0 for _ in months], index=months)
