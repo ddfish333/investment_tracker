@@ -2,47 +2,49 @@ import pandas as pd
 from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
 from modules.holding_parser import parse_monthly_holdings
 
-def calculate_monthly_asset_value(transaction_path):
-    # 解析持股資料 (回傳 Lo, Sean, Joint 各自持股 DataFrame 以及所有代碼和月份)
-    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, *_ = parse_monthly_holdings(transaction_path)
-    # 建立 owner->持股表 的字典
-    monthly_holdings = {
-        'Lo': monthly_Lo,
-        'Sean': monthly_Sean,
-        'Joint': monthly_SeanLo,
-    }
 
-    # 取得月末價格與匯率
+def calculate_monthly_asset_value(transaction_path):
+    """
+    計算每月資產價值並分拆 joint (Sean/Lo) 一半至 Sean 與 Lo，
+    並附加總資產欄位。
+
+    回傳:
+    - summary_df: 每月總資產 DataFrame (index=月份, columns=[Lo, Sean, Total])
+    - detail_df: 每月各股票各人資產 DataFrame (index=月份, columns=MultiIndex[代碼, 所有人])
+    """
+    # 取得每月持股數 (Lo, Sean, joint)
+    monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, *_ = parse_monthly_holdings(transaction_path)
+
+    # 取得月末股價與匯率
     price_df = fetch_month_end_prices(all_codes, all_months)
     fx_series = fetch_month_end_fx(all_months)
 
-    # 初始化資產表（Summary）
-    summary = pd.DataFrame(index=all_months, columns=["Lo", "Sean"]).fillna(0)
-    # 初始化各股票明細表（Detail），三層索引: 月份, 股票代號, 所有人
-    detail = pd.DataFrame(
-        index=all_months,
-        columns=pd.MultiIndex.from_product([all_codes, ["Lo", "Sean", "Joint"]]),
-    ).fillna(0)
+    # 構建 detail DataFrame, 使用 MultiIndex (code, owner)
+    owners = ['Lo', 'Sean']
+    detail_cols = pd.MultiIndex.from_product([all_codes, owners], names=['code', 'owner'])
+    detail_df = pd.DataFrame(0.0, index=all_months, columns=detail_cols)
 
-    # 計算每月每支股票各自資產
-    for month in all_months:
-        for owner, df in monthly_holdings.items():
-            for code in all_codes:
-                shares = df.at[month, code]
-                price = price_df.at[month, code]
-                # 美股乘以匯率
-                if str(code).endswith("US"):
-                    price *= fx_series.at[month]
-                value = shares * price
+    # 計算各人資產
+    for code in all_codes:
+        # 持股拆分: joint 平分到兩人
+        shares_lo = monthly_Lo[code] + monthly_SeanLo[code] / 2
+        shares_sean = monthly_Sean[code] + monthly_SeanLo[code] / 2
 
-                # 累加到 Summary (Joint 對應分到兩人各半)
-                if owner == 'Joint':
-                    summary.at[month, 'Lo'] += value / 2
-                    summary.at[month, 'Sean'] += value / 2
-                else:
-                    summary.at[month, owner] += value
+        # 計算資產 (台股不換算匯率，美股需乘匯率)
+        is_us = str(code).endswith("US")
+        price = price_df[code]
+        if is_us:
+            assets_lo = shares_lo * price * fx_series
+            assets_sean = shares_sean * price * fx_series
+        else:
+            assets_lo = shares_lo * price
+            assets_sean = shares_sean * price
 
-                # 記錄到 Detail
-                detail.at[month, (code, owner)] = value
+        detail_df[(code, 'Lo')] = assets_lo
+        detail_df[(code, 'Sean')] = assets_sean
 
-    return summary, detail
+    # 計算 summary: 各人與總資產
+    summary_df = detail_df.sum(axis=1, level='owner')
+    summary_df['Total'] = summary_df.sum(axis=1)
+
+    return summary_df, detail_df
