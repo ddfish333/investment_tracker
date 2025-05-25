@@ -10,8 +10,8 @@ def fetch_month_end_prices(codes, months):
     未來可替換為實際 API 呼叫
     """
     # 建立固定價格 DataFrame，index 為 months, columns 為 codes
-    df = pd.DataFrame({code: [100.0] * len(months) for code in codes}, index=months)
-    return df.reindex(months).astype(float)
+    price_df = pd.DataFrame({code: [100.0] * len(months) for code in codes}, index=months)
+    return price_df.astype(float)
 
 
 def fetch_month_end_fx(months, base="USD", quote="TWD"):
@@ -19,6 +19,6 @@ def fetch_month_end_fx(months, base="USD", quote="TWD"):
     擷取每月 USD->TWD 匯率。
     目前模擬：固定 30.0
     """
-    series = pd.Series([30.0] * len(months), index=months)
-    return series.reindex(months).astype(float)
-```  
+    fx = pd.Series([30.0] * len(months), index=months)
+    return fx.astype(float)
+```
