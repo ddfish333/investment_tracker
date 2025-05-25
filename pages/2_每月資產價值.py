@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -5,9 +6,6 @@ import matplotlib.font_manager as fm
 from modules.asset_value import calculate_monthly_asset_value
 
 # --- Streamlit Page Setup ---
-# 修改後（直接使用 utf-8 中文並明確指定 .py 檔案的編碼）
-# 在檔案上方加上 encoding declaration 表示 utf-8
-# -*- coding: utf-8 -*-
 st.set_page_config(page_title="每月資產價值", layout="wide")
 
 # 設定中文字體
@@ -28,10 +26,10 @@ sean_curr = summary_df['Sean'].iloc[-1]
 st.title(f"💸 每月資產價值（以台幣計值）")
 st.markdown(f"**目前資產狀況**｜ Lo：NT${lo_curr:,.0f} 元｜ Sean：NT${sean_curr:,.0f} 元")
 
-st.subheader("總資產走勢：Lo vs Sean")
+st.subheader("總資產跑動：Lo vs Sean")
 st.line_chart(summary_df[['Lo', 'Sean']])
 
-st.subheader("各股票資產走勢明細")
+st.subheader("各股票資產跑動詳細")
 for owner in ['Lo', 'Sean']:
     st.write(f"### {owner}｜目前台幣資產：NT${summary_df[owner].iloc[-1]:,.0f}")
     df = detail_df[owner].copy()
