@@ -3,8 +3,6 @@ import os
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import matplotlib.cm as cm
-import numpy as np
 import pandas as pd
 from modules.asset_value import calculate_monthly_asset_value
 
@@ -34,11 +32,19 @@ st.line_chart(summary_df[['Sean', 'Lo']])
 
 st.subheader("各股票資產跑動詳細")
 
+# 指定顏色：讓 6770 換成不同色
+custom_colors = {
+    '6770': '#e63946',  # 深紅色（與2330不同）
+    '2330': '#1f77b4',  # 預設藍色
+}
+
+# Check if detail_df has MultiIndex columns
 if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
     for owner in ['Sean', 'Lo']:
-        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
+        st.markdown(f"#### {owner} 資產組合")
+        df = detail_df.xs(owner, axis=1, level='Owner')
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
@@ -51,20 +57,15 @@ else:
         df_display = df.copy()
         df_display.index = df_display.index.strftime("%Y-%m")
 
-        # 顏色數量與股票數相符，使用 matplotlib 的 Blues 色盤
-        cmap = cm.get_cmap("Blues", len(df.columns))
-        color_list = [cmap(i) for i in range(len(df.columns))]
+        # 自訂顏色列表（順序對應欄位）
+        color_list = [custom_colors.get(code, None) for code in df.columns]
 
-        fig, ax = plt.subplots(figsize=(10, 4))
-        bottom = np.zeros(len(df_display))
+        fig, ax = plt.subplots(figsize=(12, 4))
+        bottom = pd.Series([0] * len(df), index=df.index)
+        for i, code in enumerate(df.columns):
+            ax.bar(df.index, df[code], label=code, bottom=bottom, color=color_list[i])
+            bottom += df[code]
 
-        for i, code in enumerate(df_display.columns):
-            ax.bar(df_display.index, df_display[code], label=str(code), bottom=bottom, color=color_list[i])
-            bottom += df_display[code].values
-
-        ax.set_title(f"{owner} 每月股票資產分佈（堆疊長條圖）")
-        ax.set_ylabel("台幣資產")
-        ax.set_xticks(range(len(df_display.index)))
-        ax.set_xticklabels(df_display.index, rotation=45, ha='right')
+        ax.set_title(f"{owner} 每月資產變化（長條圖）")
         ax.legend(fontsize=8, ncol=6)
         st.pyplot(fig)
