@@ -4,7 +4,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import pandas as pd
-import numpy as np  # <== 加入這行
+import numpy as np
 from modules.asset_value import calculate_monthly_asset_value
 
 # --- Streamlit Page Setup ---
@@ -33,11 +33,11 @@ st.line_chart(summary_df[['Sean', 'Lo']])
 
 st.subheader("各股票資產跑動詳細")
 
-# 擴充的冷色系顏色（Blues colormap from matplotlib）
+# 冷色系漸層（支援更多顏色）
 cool_colors = plt.cm.Blues_r(np.linspace(0.3, 0.9, 50))
 
 if not isinstance(detail_df.columns, pd.MultiIndex):
-    st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
+    st.error("detail_df 的欄位不是 MultiIndex 格式，無法分別顯示 Sean/Lo")
 else:
     for owner in ['Sean', 'Lo']:
         df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
@@ -51,18 +51,18 @@ else:
         df = df[sorted_codes + zero_codes]
 
         df.index = df.index.strftime("%Y-%m")
+        df_plot = df.T
 
-        fig, ax = plt.subplots(figsize=(10, 4))
-        bottom = pd.Series([0] * len(df), index=df.index)
+        fig, ax = plt.subplots(figsize=(12, 4))
+        bottom = np.zeros(len(df.columns))
 
-        for i, code in enumerate(df.columns):
-            color = cool_colors[i % len(cool_colors)]
-            ax.bar(df.index, df[code], label=code, bottom=bottom, color=color)
-            bottom += df[code]
+        for i, code in enumerate(df_plot.index):
+            ax.bar(df.columns, df_plot.loc[code], bottom=bottom, label=str(code), color=cool_colors[i % len(cool_colors)])
+            bottom += df_plot.loc[code].values
 
         ax.set_title(f"{owner} 每月股票資產分佈（堆疊長條圖）")
         ax.set_ylabel("台幣資產")
-        ax.set_xticks(range(len(df.index)))
-        ax.set_xticklabels(df.index, rotation=45, ha='right')
+        ax.set_xticks(range(len(df.columns)))
+        ax.set_xticklabels(df.columns, rotation=45, ha='right')
         ax.legend(fontsize=8, ncol=5)
         st.pyplot(fig)
