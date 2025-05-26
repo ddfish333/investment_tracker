@@ -30,14 +30,16 @@ st.markdown(f"**目前資產狀況**｜ Sean：NT${sean_curr:,.0f} 元｜ Lo：N
 st.subheader("總資產跑動：Sean vs Lo")
 st.line_chart(summary_df[['Sean', 'Lo']])
 
-st.subheader("Sean 每月資產變化")
-if isinstance(detail_df.columns, pd.MultiIndex) and 'Sean' in detail_df.columns.get_level_values("Owner"):
-    df_sean = detail_df.loc[:, detail_df.columns.get_level_values("Owner") == "Sean"]
-    df_sean['Total'] = df_sean.sum(axis=1)
-    st.line_chart(df_sean)
+st.subheader("各股票資產跑動詳細")
 
-st.subheader("Lo 每月資產變化")
-if isinstance(detail_df.columns, pd.MultiIndex) and 'Lo' in detail_df.columns.get_level_values("Owner"):
-    df_lo = detail_df.loc[:, detail_df.columns.get_level_values("Owner") == "Lo"]
-    df_lo['Total'] = df_lo.sum(axis=1)
-    st.line_chart(df_lo)
+# 使用 line_chart 版本來顯示 Sean 與 Lo 的總和變化
+for owner in ['Sean', 'Lo']:
+    df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
+    if df.empty:
+        st.warning(f"找不到 {owner} 的資料")
+        continue
+
+    # 計算各月合計資產
+    df_total = df.sum(axis=1).to_frame(name=f"{owner}_Total")
+    st.write(f"#### {owner} 每月資產總額")
+    st.line_chart(df_total)
