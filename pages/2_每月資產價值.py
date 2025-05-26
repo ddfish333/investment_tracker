@@ -48,7 +48,8 @@ else:
         df = df[sorted_codes + zero_codes]
 
         df_display = df.copy()
-        df_display.columns = [code for code, _ in df.columns]  # 去除 MultiIndex 連續性
+        df_display.columns = ["stock" for code, _ in df.columns]  # 將欄名改為 stock
+        df_display.index.name = "date"  # 將 index 名稱改為 date
         df_display.index = df_display.index.strftime("%Y-%m")
 
         st.markdown(f"#### {owner} 每月資產變化")

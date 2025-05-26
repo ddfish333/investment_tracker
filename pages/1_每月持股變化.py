@@ -1,9 +1,13 @@
-# pages/1_每月持股變化.py
+# -*- coding: utf-8 -*-
+import os
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import os
-from modules.holding_parser import parse_monthly_holdings
+import pandas as pd
+from modules.asset_value import calculate_monthly_asset_value
+
+# --- Streamlit Page Setup ---
+st.set_page_config(page_title="每月資產價值", layout="wide")
 
 # 設定中文字體
 font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
@@ -14,111 +18,61 @@ else:
     plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['axes.unicode_minus'] = False
 
-# 顏色與背景設置
-plt.style.use("dark_background")
-plt.rcParams['axes.facecolor'] = '#0E1117'
-plt.rcParams['figure.facecolor'] = '#0E1117'
-plt.rcParams['axes.edgecolor'] = 'white'
-plt.rcParams['xtick.color'] = 'white'
-plt.rcParams['ytick.color'] = 'white'
-plt.rcParams['text.color'] = 'white'
-plt.rcParams['axes.labelcolor'] = 'white'
-plt.rcParams['legend.facecolor'] = '#0E1117'
+# --- 計算資產 ---
+summary_df, detail_df = calculate_monthly_asset_value("data/transactions.xlsx")
+sean_curr = summary_df['Sean'].iloc[-1]
+lo_curr = summary_df['Lo'].iloc[-1]
 
-# 載入交易資料
-monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months, raw_df, color_map = \
-    parse_monthly_holdings("data/transactions.xlsx")
+# --- 顯示結果 ---
+st.title(f"💸 每月資產價值（以台幣計值）")
+st.markdown(f"**目前資產狀況**｜ Sean：NT${sean_curr:,.0f} 元｜ Lo：NT${lo_curr:,.0f} 元")
 
-st.set_page_config(layout="wide")
-st.title("Sean & Lo 每月持股變化")
+st.subheader("總資產跑動：Sean vs Lo")
+st.line_chart(summary_df[['Sean', 'Lo']])
 
-# 顏色定義
-color_dict = {
-    "Lo": "#87CEEB",
-    "Sean": "#4682B4",
-    "Sean/Lo": "#1E3F66",
-}
-gray_dict = {
-    "Lo": "#D3D3D3",
-    "Sean": "#A9A9A9",
-    "Sean/Lo": "#696969",
-}
+st.subheader("各股票資產跑動詳細")
 
-def is_current_zero(code):
-    """
-    判斷最後一個月份持股是否為零
-    """
-    last = all_months[-1]
-    return (
-        monthly_Lo.at[last, code] +
-        monthly_Sean.at[last, code] +
-        monthly_SeanLo.at[last, code]
-    ) == 0
+# 冷色系配色方案（最多支援 10 檔）
+cool_colors = [
+    "#1f77b4",  # 深藍
+    "#2a9fd6",  # 淺藍
+    "#17becf",  # 藍綠
+    "#4c72b0",  # 紫藍
+    "#76b7b2",  # 淺綠藍
+    "#5DA5DA",  # 藍灰
+    "#AEC7E8",  # 淡藍
+    "#6baed6",  # 藍灰中間色
+    "#9ecae1",  # 淺灰藍
+    "#c6dbef",  # 最淡藍
+]
 
-def is_us_stock(code):
-    """判斷是否為美股代碼，依原始交易標示欄位"""
-    try:
-        return raw_df.loc[raw_df['股票代號'] == code, '台股/美股'].iloc[0] == '美股'
-    except:
-        return str(code).upper().endswith("US")
+if not isinstance(detail_df.columns, pd.MultiIndex):
+    st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
+else:
+    for owner in ['Sean', 'Lo']:
+        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
+        if df.empty:
+            st.warning(f"找不到 {owner} 的資料")
+            continue
 
-# 計算台股與美股 Y 軸最大值
-us_codes = [c for c in all_codes if is_us_stock(c)]
-tw_codes = [c for c in all_codes if not is_us_stock(c)]
+        latest = df.iloc[-1]
+        sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
+        zero_codes = latest[latest == 0].index.tolist()
+        df = df[sorted_codes + zero_codes]
 
-max_tw = max(
-    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
-    for c in tw_codes
-) * 1.1 if tw_codes else 0
+        df.index = df.index.strftime("%Y-%m")
 
-max_us = max(
-    (monthly_Lo[c] + monthly_Sean[c] + monthly_SeanLo[c]).max()
-    for c in us_codes
-) * 1.1 if us_codes else 0
+        fig, ax = plt.subplots(figsize=(10, 4))
+        bottom = pd.Series([0] * len(df), index=df.index)
 
-# 按最後月份持股大小排序（大到小）
-all_codes_sorted = sorted(
-    all_codes,
-    key=lambda c: (
-        monthly_Lo[c].iloc[-1] +
-        monthly_Sean[c].iloc[-1] +
-        monthly_SeanLo[c].iloc[-1]
-    ),
-    reverse=True
-)
+        for i, code in enumerate(df.columns):
+            color = cool_colors[i % len(cool_colors)]
+            ax.bar(df.index, df[code], label=code, bottom=bottom, color=color)
+            bottom += df[code]
 
-# 顯示圖表
-cols = st.columns(2)
-for idx, code in enumerate(all_codes_sorted):
-    with cols[idx % 2]:
-        fig, ax = plt.subplots(figsize=(4.8, 2.2))
-        current_zero = is_current_zero(code)
-        palette = gray_dict if current_zero else color_dict
-
-        ax.bar(monthly_Lo.index, monthly_Lo[code], color=palette["Lo"], label="Lo", width=20)
-        ax.bar(
-            monthly_Sean.index,
-            monthly_Sean[code],
-            bottom=monthly_Lo[code],
-            color=palette["Sean"],
-            label="Sean",
-            width=20,
-        )
-        ax.bar(
-            monthly_SeanLo.index,
-            monthly_SeanLo[code],
-            bottom=monthly_Lo[code] + monthly_Sean[code],
-            color=palette["Sean/Lo"],
-            label="Sean/Lo",
-            width=20,
-        )
-
-        ax.set_title(f"{code} 持股變化圖", fontsize=10)
-        ax.tick_params(axis='x', labelrotation=45, labelsize=8)
-        ax.tick_params(axis='y', labelsize=8)
-        # 設定 Y 軸上限
-        max_val = max_us if is_us_stock(code) else max_tw
-        ax.set_ylim(0, max_val)
-        ax.legend(fontsize=7)
-        plt.tight_layout()
+        ax.set_title(f"{owner} 每月股票資產分佈（堆疊長條圖）")
+        ax.set_ylabel("台幣資產")
+        ax.set_xticks(range(len(df.index)))
+        ax.set_xticklabels(df.index, rotation=45, ha='right')
+        ax.legend(fontsize=8, ncol=5)
         st.pyplot(fig)
