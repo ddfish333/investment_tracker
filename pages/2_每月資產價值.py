@@ -3,8 +3,8 @@ import os
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-from modules.asset_value import calculate_monthly_asset_value
 import pandas as pd
+from modules.asset_value import calculate_monthly_asset_value
 
 # --- Streamlit Page Setup ---
 st.set_page_config(page_title="每月資產價值", layout="wide")
@@ -21,42 +21,41 @@ plt.rcParams['axes.unicode_minus'] = False
 # --- 計算資產 ---
 summary_df, detail_df = calculate_monthly_asset_value("data/transactions.xlsx")
 
-# 容錯處理：若 summary_df 為空則設為 0
+# 數據為空時先顯示空值
 try:
     lo_curr = summary_df['Lo'].iloc[-1]
-except:
+except Exception:
     lo_curr = 0
+
 try:
     sean_curr = summary_df['Sean'].iloc[-1]
-except:
+except Exception:
     sean_curr = 0
 
 # --- 顯示結果 ---
 st.title(f"💸 每月資產價值（以台幣計值）")
 st.markdown(f"**目前資產狀況**｜ Lo：NT${lo_curr:,.0f} 元｜ Sean：NT${sean_curr:,.0f} 元")
 
-# 總資產趨勢圖
+st.subheader("總資產跑動：Lo vs Sean")
 if not summary_df.empty:
-    st.subheader("總資產跑動：Lo vs Sean")
     st.line_chart(summary_df[['Lo', 'Sean']])
 else:
-    st.warning("目前無總資產資料")
+    st.info("沒有數據可顯示")
 
-# 各股票資產明細圖
 st.subheader("各股票資產跑動詳細")
 for owner in ['Lo', 'Sean']:
-    if (owner not in detail_df.columns.get_level_values(0)):
-        st.write(f"### {owner}｜目前台幣資產：無資料")
+    st.write(f"### {owner}｜目前台幣資產：NT${summary_df.get(owner, pd.Series([0])).iloc[-1]:,.0f}")
+
+    try:
+        df = detail_df.loc[:, owner].copy()
+    except KeyError:
+        st.warning(f"找不到 {owner} 的資料")
         continue
 
-    df = detail_df.loc[:, owner].copy()
     df['Total'] = df.sum(axis=1)
 
-    current_total = df['Total'].iloc[-1] if not df.empty else 0
-    st.write(f"### {owner}｜目前台幣資產：NT${current_total:,.0f}")
-
     # 排序股票：剩餘資產多的放前面
-    latest = df.iloc[-1].drop('Total') if not df.empty else pd.Series()
+    latest = df.iloc[-1].drop('Total')
     sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
     zero_codes = latest[latest == 0].index.tolist()
     df = df[sorted_codes + zero_codes + ['Total']]
