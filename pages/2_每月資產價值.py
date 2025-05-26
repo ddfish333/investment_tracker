@@ -32,12 +32,14 @@ st.line_chart(summary_df[['Sean', 'Lo']])
 
 st.subheader("各股票資產跑動詳細")
 
-# Check if detail_df has MultiIndex columns
+# 擴充冷色系配色方案（支援更多檔）
+cool_colors = plt.cm.Blues_r(np.linspace(0.3, 0.9, 50))  # 生成 50 種藍色系
+
 if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
     for owner in ['Sean', 'Lo']:
-        df = detail_df.xs(owner, axis=1, level='Owner', drop_level=False).copy()
+        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
@@ -47,9 +49,19 @@ else:
         zero_codes = latest[latest == 0].index.tolist()
         df = df[sorted_codes + zero_codes]
 
-        df_display = df.copy()
-        df_display.columns = [code for code, _ in df.columns]  # 去除 MultiIndex 連續性
-        df_display.index = df_display.index.strftime("%Y-%m")
+        df.index = df.index.strftime("%Y-%m")
 
-        st.markdown(f"#### {owner} 每月資產變化")
-        st.bar_chart(df_display)
+        fig, ax = plt.subplots(figsize=(10, 4))
+        bottom = pd.Series([0] * len(df), index=df.index)
+
+        for i, code in enumerate(df.columns):
+            color = cool_colors[i % len(cool_colors)]
+            ax.bar(df.index, df[code], label=str(code), bottom=bottom, color=color)
+            bottom += df[code]
+
+        ax.set_title(f"{owner} 每月股票資產分佈（堆疊長條圖）")
+        ax.set_ylabel("台幣資產")
+        ax.set_xticks(range(len(df.index)))
+        ax.set_xticklabels(df.index, rotation=45, ha='right')
+        ax.legend(fontsize=8, ncol=5)
+        st.pyplot(fig)
