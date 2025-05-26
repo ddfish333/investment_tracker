@@ -2,7 +2,7 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import pandas as pd
+import pandas as pd  # ⬅️ 加上 pandas
 from modules.stock_monthlyprice import get_monthly_prices
 
 # 設定中文字體
