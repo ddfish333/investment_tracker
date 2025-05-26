@@ -32,14 +32,22 @@ st.line_chart(summary_df[['Sean', 'Lo']])
 
 st.subheader("各股票資產跑動詳細")
 
-# 使用 line_chart 版本來顯示 Sean 與 Lo 的總和變化
-for owner in ['Sean', 'Lo']:
-    df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
-    if df.empty:
-        st.warning(f"找不到 {owner} 的資料")
-        continue
+# Check if detail_df has MultiIndex columns
+if not isinstance(detail_df.columns, pd.MultiIndex):
+    st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
+else:
+    for owner in ['Sean', 'Lo']:
+        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
+        if df.empty:
+            st.warning(f"找不到 {owner} 的資料")
+            continue
 
-    # 計算各月合計資產
-    df_total = df.sum(axis=1).to_frame(name=f"{owner}_Total")
-    st.write(f"#### {owner} 每月資產總額")
-    st.line_chart(df_total)
+        # 移除資產總額，改為各股票疊加視覺化
+        latest = df.iloc[-1]
+        sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
+        zero_codes = latest[latest == 0].index.tolist()
+        df = df[sorted_codes + zero_codes]  # 不加 total 改成長條圖疊加
+
+        df_display = df.copy()
+        df_display.index = df_display.index.strftime("%Y-%m")
+        st.bar_chart(df_display)
