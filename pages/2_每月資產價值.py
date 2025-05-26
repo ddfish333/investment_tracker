@@ -4,6 +4,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import pandas as pd
+import numpy as np  # <== 加入這行
 from modules.asset_value import calculate_monthly_asset_value
 
 # --- Streamlit Page Setup ---
@@ -32,8 +33,8 @@ st.line_chart(summary_df[['Sean', 'Lo']])
 
 st.subheader("各股票資產跑動詳細")
 
-# 擴充冷色系配色方案（支援更多檔）
-cool_colors = plt.cm.Blues_r(np.linspace(0.3, 0.9, 50))  # 生成 50 種藍色系
+# 擴充的冷色系顏色（Blues colormap from matplotlib）
+cool_colors = plt.cm.Blues_r(np.linspace(0.3, 0.9, 50))
 
 if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
@@ -56,7 +57,7 @@ else:
 
         for i, code in enumerate(df.columns):
             color = cool_colors[i % len(cool_colors)]
-            ax.bar(df.index, df[code], label=str(code), bottom=bottom, color=color)
+            ax.bar(df.index, df[code], label=code, bottom=bottom, color=color)
             bottom += df[code]
 
         ax.set_title(f"{owner} 每月股票資產分佈（堆疊長條圖）")
