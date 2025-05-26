@@ -3,8 +3,9 @@ import os
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import pandas as pd
+import matplotlib.cm as cm
 import numpy as np
+import pandas as pd
 from modules.asset_value import calculate_monthly_asset_value
 
 # --- Streamlit Page Setup ---
@@ -25,7 +26,7 @@ sean_curr = summary_df['Sean'].iloc[-1]
 lo_curr = summary_df['Lo'].iloc[-1]
 
 # --- 顯示結果 ---
-st.title(f"\U0001F4B8 每月資產價值（以台幣計值）")
+st.title(f"💸 每月資產價值（以台幣計值）")
 st.markdown(f"**目前資產狀況**｜ Sean：NT${sean_curr:,.0f} 元｜ Lo：NT${lo_curr:,.0f} 元")
 
 st.subheader("總資產跑動：Sean vs Lo")
@@ -33,38 +34,37 @@ st.line_chart(summary_df[['Sean', 'Lo']])
 
 st.subheader("各股票資產跑動詳細")
 
-# 冷色系配色（支援 50 種）
-cool_colors = plt.cm.Blues_r(np.linspace(0.3, 0.9, 50))
-
 if not isinstance(detail_df.columns, pd.MultiIndex):
-    st.error("detail_df 的欄位不是 MultiIndex 格式，無法分別顯示 Sean / Lo")
+    st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
     for owner in ['Sean', 'Lo']:
-        df = detail_df.xs(owner, level='Owner', axis=1).copy()
+        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
 
-        # 排序股票：剩餘資產多的放前面
         latest = df.iloc[-1]
         sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
         zero_codes = latest[latest == 0].index.tolist()
         df = df[sorted_codes + zero_codes]
 
-        df.index = df.index.strftime("%Y-%m")
+        df_display = df.copy()
+        df_display.index = df_display.index.strftime("%Y-%m")
 
-        fig, ax = plt.subplots(figsize=(12, 5))
-        bottom = np.zeros(len(df))
-        x = np.arange(len(df.index))
+        # 顏色數量與股票數相符，使用 matplotlib 的 Blues 色盤
+        cmap = cm.get_cmap("Blues", len(df.columns))
+        color_list = [cmap(i) for i in range(len(df.columns))]
 
-        for i, code in enumerate(df.columns):
-            color = cool_colors[i % len(cool_colors)]
-            ax.bar(x, df[code].values, bottom=bottom, label=str(code), color=color)
-            bottom += df[code].values
+        fig, ax = plt.subplots(figsize=(10, 4))
+        bottom = np.zeros(len(df_display))
+
+        for i, code in enumerate(df_display.columns):
+            ax.bar(df_display.index, df_display[code], label=str(code), bottom=bottom, color=color_list[i])
+            bottom += df_display[code].values
 
         ax.set_title(f"{owner} 每月股票資產分佈（堆疊長條圖）")
         ax.set_ylabel("台幣資產")
-        ax.set_xticks(x)
-        ax.set_xticklabels(df.index, rotation=45, ha='right')
-        ax.legend(fontsize=8, ncol=5)
+        ax.set_xticks(range(len(df_display.index)))
+        ax.set_xticklabels(df_display.index, rotation=45, ha='right')
+        ax.legend(fontsize=8, ncol=6)
         st.pyplot(fig)
