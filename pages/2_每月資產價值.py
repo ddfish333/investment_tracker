@@ -36,7 +36,7 @@ st.subheader("各股票資產跑動詳細")
 if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
-    for owner in ['Sean', 'Lo']:
+    for owner in ['Sean', 'Lo', 'Sean/Lo']:  # 按照 Sean 前面順序
         # filter sub-dataframe for owner
         df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
         if df.empty:
