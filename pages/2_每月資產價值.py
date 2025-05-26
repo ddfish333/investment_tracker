@@ -36,9 +36,10 @@ st.subheader("各股票資產跑動詳細")
 if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
-    for owner in ['Sean', 'Lo', 'Sean/Lo']:  # 按照 Sean 前面順序
-        # filter sub-dataframe for owner
-        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
+    for owner in ['Sean', 'Lo', 'Sean/Lo']:
+        owner_label = 'Joint' if owner == 'Sean/Lo' else owner
+        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner_label].copy()
+
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
@@ -55,12 +56,13 @@ else:
 
         fig, ax = plt.subplots(figsize=(12, 4))
         for code in df.columns:
+            label = str(code)
             if code == 'Total':
-                ax.plot(df.index, df[code], label=code, linewidth=2.5, color='white')
+                ax.plot(df.index, df[code], label=label, linewidth=2.5, color='white')
             elif code in sorted_codes:
-                ax.plot(df.index, df[code], label=code)
+                ax.plot(df.index, df[code], label=label)
             else:
-                ax.plot(df.index, df[code], label=code, linestyle='dotted', color='gray')
+                ax.plot(df.index, df[code], label=label, linestyle='dotted', color='gray')
         ax.set_title(f"{owner} 各股票月資產變化")
         ax.legend(ncol=5, fontsize=8)
         st.pyplot(fig)
