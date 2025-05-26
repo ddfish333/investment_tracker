@@ -20,8 +20,15 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # --- 計算資產 ---
 summary_df, detail_df = calculate_monthly_asset_value("data/transactions.xlsx")
-sean_curr = summary_df['Sean'].iloc[-1]
-lo_curr = summary_df['Lo'].iloc[-1]
+# 將 Joint 的一半加到各自持有者
+if ('Joint' in summary_df.columns):
+    sean_curr = (summary_df['Sean'] + summary_df['Joint'] * 0.5).iloc[-1]
+    lo_curr = (summary_df['Lo'] + summary_df['Joint'] * 0.5).iloc[-1]
+    summary_df['Sean'] += summary_df['Joint'] * 0.5
+    summary_df['Lo'] += summary_df['Joint'] * 0.5
+else:
+    sean_curr = summary_df['Sean'].iloc[-1]
+    lo_curr = summary_df['Lo'].iloc[-1]
 
 # --- 顯示結果 ---
 st.title(f"💸 每月資產價值（以台幣計值）")
@@ -38,6 +45,10 @@ if not isinstance(detail_df.columns, pd.MultiIndex):
 else:
     for owner in ['Sean', 'Lo']:
         df = detail_df.xs(owner, axis=1, level='Owner').copy()
+        if 'Joint' in detail_df.columns.get_level_values('Owner'):
+            df_joint = detail_df.xs('Joint', axis=1, level='Owner').copy() * 0.5
+            df += df_joint
+
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
