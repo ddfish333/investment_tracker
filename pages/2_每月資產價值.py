@@ -37,17 +37,19 @@ if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
     for owner in ['Sean', 'Lo']:
-        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner].copy()
+        df = detail_df.xs(owner, axis=1, level='Owner', drop_level=False).copy()
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
 
-        # 移除資產總額，改為各股票疊加視覺化
         latest = df.iloc[-1]
         sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
         zero_codes = latest[latest == 0].index.tolist()
-        df = df[sorted_codes + zero_codes]  # 不加 total 改成長條圖疊加
+        df = df[sorted_codes + zero_codes]
 
         df_display = df.copy()
+        df_display.columns = [code for code, _ in df.columns]  # 去除 MultiIndex 連續性
         df_display.index = df_display.index.strftime("%Y-%m")
+
+        st.markdown(f"#### {owner} 每月資產變化")
         st.bar_chart(df_display)
