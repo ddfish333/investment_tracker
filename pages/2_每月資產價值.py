@@ -37,7 +37,7 @@ if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
     for owner in ['Sean', 'Lo']:
-        df = detail_df.xs(owner, axis=1, level='Owner', drop_level=False).copy()
+        df = detail_df.xs(owner, axis=1, level='Owner').copy()
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
@@ -49,8 +49,8 @@ else:
 
         df_display = df.copy()
         df_display.columns.name = "stock"  # 設定欄位名稱為 stock
-        df_display.index.name = "date"  # 將 index 名稱改為 date
         df_display.index = df_display.index.strftime("%Y-%m")
+        df_display.index.name = "date"  # 將 index 名稱改為 date
 
         st.markdown(f"#### {owner} 每月資產變化")
         st.bar_chart(df_display)
