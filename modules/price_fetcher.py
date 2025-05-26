@@ -1,29 +1,22 @@
-### modules/price_fetcher.py
 import pandas as pd
-from datetime import datetime
-
+from modules.stock_monthlyprice import fetch_monthly_prices_batch
 
 def fetch_month_end_prices(codes, months):
     """
-    模擬或真實抓取每月收盤價
-    - codes: list of stock codes
-    - months: DatetimeIndex of month-ends
-    回傳 DataFrame(index=months, columns=codes) with float prices
+    根據股票代碼與月份，抓取每月最後一天的收盤價
+    - codes: list of 股票代碼
+    - months: DatetimeIndex（應該是 timestamp 格式）
     """
-    # placeholder: 全部價格俗定為 100.0
-    df = pd.DataFrame(
-        {code: [100.0] * len(months) for code in codes},
-        index=months
-    )
-    return df.astype(float)
+    start = months.min().strftime("%Y-%m-%d")
+    end = months.max().strftime("%Y-%m-%d")
 
+    df = fetch_monthly_prices_batch(codes, start=start, end=end)
+    df = df.reindex(months)  # 確保 index 與月資料對齊
+    return df
 
-def fetch_month_end_fx(months, base="USD", quote="TWD"):  # noqa: ARG000
+def fetch_month_end_fx(months, base="USD", quote="TWD"):
     """
-    模擬或真實抓取每月匯率
-    - months: DatetimeIndex of month-ends
-    回傳 Series(index=months) with float FX rate
+    模擬匯率：全為 30.0
+    未來可擴充為 API 抓取匯率
     """
-    # placeholder: 全部匯率俗定為 30.0
-    fx = pd.Series([30.0] * len(months), index=months)
-    return fx.astype(float)
+    return pd.Series([30.0] * len(months), index=months)
