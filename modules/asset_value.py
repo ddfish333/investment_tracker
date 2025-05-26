@@ -1,6 +1,6 @@
 import pandas as pd
 from modules.holding_parser import parse_monthly_holdings
-from modules.price_fetcher import fetch_month_end_prices, fetch_month_end_fx
+from modules.price_fetcher import fetch_monthly_prices_batch, fetch_month_end_fx
 
 
 def calculate_monthly_asset_value(transaction_path):
@@ -8,7 +8,7 @@ def calculate_monthly_asset_value(transaction_path):
     monthly_Lo, monthly_Sean, monthly_Joint, codes, months = parse_monthly_holdings(transaction_path)
 
     # 抓取 API 月末股價與匯率
-    price_df = fetch_month_end_prices(codes, months)
+    price_df = fetch_monthly_prices_batch(codes, months)
     fx_ser = fetch_month_end_fx(months)
 
     # 計算各自資產（依原始幣別調整）
