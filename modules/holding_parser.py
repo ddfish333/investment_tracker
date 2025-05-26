@@ -65,4 +65,5 @@ def parse_monthly_holdings(filepath):
             for v in series
         ]
 
-    return monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, monthly_Lo.index, df
+    return monthly_Lo, monthly_Sean, monthly_SeanLo, all_codes, all_months
+
