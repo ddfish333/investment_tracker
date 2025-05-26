@@ -24,43 +24,27 @@ sean_curr = summary_df['Sean'].iloc[-1]
 lo_curr = summary_df['Lo'].iloc[-1]
 
 # --- 顯示結果 ---
-st.title(f"💸 每月資產價值（以台幣計值）")
+st.title(f"\U0001F4B8 每月資產價值（以台幣計值）")
 st.markdown(f"**目前資產狀況**｜ Sean：NT${sean_curr:,.0f} 元｜ Lo：NT${lo_curr:,.0f} 元")
 
+# --- 總資產趨勢 ---
 st.subheader("總資產跑動：Sean vs Lo")
 st.line_chart(summary_df[['Sean', 'Lo']])
 
-st.subheader("各股票資產跑動詳細")
+# --- 個別持有人資產明細長條圖 ---
+for owner in ['Sean', 'Lo']:
+    df = detail_df.xs(owner, axis=1, level='Owner').fillna(0).copy()
+    df['Total'] = df.sum(axis=1)
+    st.write(f"### {owner} ｜ 目前台幣資產：NT${df['Total'].iloc[-1]:,.0f}")
 
-if not isinstance(detail_df.columns, pd.MultiIndex):
-    st.error("detail_df 的欄位不是 MultiIndex 格式，無法分別顯示 Sean/Lo")
-else:
-    for owner in ['Sean', 'Lo']:
-        df = detail_df.xs(owner, level='Owner', axis=1).copy()
-        if df.empty:
-            st.warning(f"找不到 {owner} 的資料")
-            continue
+    fig, ax = plt.subplots(figsize=(12, 4))
+    bottom = pd.Series([0] * len(df), index=df.index)
 
-        df['Total'] = df.sum(axis=1)
-        current_twd = df['Total'].iloc[-1]
-        st.write(f"### {owner} ｜ 目前台幣資產：NT${current_twd:,.0f}")
+    for code in df.drop(columns='Total').columns:
+        values = df[code].fillna(0)
+        ax.bar(df.index, values, label=code, bottom=bottom)
+        bottom += values
 
-        # 排序股票：剩餘資產多的放前面
-        latest = df.iloc[-1].drop('Total')
-        sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
-        zero_codes = latest[latest == 0].index.tolist()
-        plot_codes = sorted_codes + zero_codes
-
-        df_plot = df[plot_codes].copy()
-
-        fig, ax = plt.subplots(figsize=(12, 4))
-        bottom = pd.Series([0]*len(df_plot), index=df_plot.index)
-        for code in plot_codes:
-            values = df_plot[code].fillna(0)
-            ax.bar(df_plot.index, values, bottom=bottom, label=str(code))
-            bottom += values
-
-        ax.set_title(f"{owner} 各股票月資產變化（長條堆疊圖）")
-        ax.set_ylabel("資產（元）")
-        ax.legend(ncol=5, fontsize=8)
-        st.pyplot(fig)
+    ax.set_title(f"{owner} 各股票月資產變化（長條堆疊圖）")
+    ax.legend(ncol=5, fontsize=8, loc='upper left')
+    st.pyplot(fig)
