@@ -36,10 +36,8 @@ st.subheader("各股票資產跑動詳細")
 if not isinstance(detail_df.columns, pd.MultiIndex):
     st.error("detail_df 的欄位不是 MultiIndex格式，無法分別顯示 Sean/Lo")
 else:
-    for owner in ['Sean', 'Lo', 'Sean/Lo']:
-        owner_label = 'Joint' if owner == 'Sean/Lo' else owner
-        df = detail_df.loc[:, detail_df.columns.get_level_values('Owner') == owner_label].copy()
-
+    for owner in ['Sean', 'Lo']:
+        df = detail_df.xs(owner, axis=1, level='Owner', drop_level=False).copy()
         if df.empty:
             st.warning(f"找不到 {owner} 的資料")
             continue
@@ -48,21 +46,27 @@ else:
         current_twd = df['Total'].iloc[-1]
         st.write(f"### {owner} ｜ 目前台幣資產：NT${current_twd:,.0f}")
 
-        # sort columns by current value
-        latest = df.iloc[-1].drop('Total')
-        sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
-        zero_codes = latest[latest == 0].index.tolist()
-        df = df[sorted_codes + zero_codes + ['Total']]
+        # 重新排序股票欄位（取 level 0 的 code）
+        stock_latest = df.iloc[-1].drop('Total')
+        sorted_codes = stock_latest[stock_latest > 0].sort_values(ascending=False).index.get_level_values(0).tolist()
+        zero_codes = stock_latest[stock_latest == 0].index.get_level_values(0).tolist()
+
+        # 移除重複並維持順序
+        sorted_codes = list(dict.fromkeys(sorted_codes))
+        zero_codes = list(dict.fromkeys(zero_codes))
+
+        col_order = [(code, owner) for code in sorted_codes + zero_codes if (code, owner) in df.columns] + [('Total', '')]
+        df.columns = pd.MultiIndex.from_tuples(df.columns)
+        df = df[col_order]
 
         fig, ax = plt.subplots(figsize=(12, 4))
         for code in df.columns:
-            label = str(code)
-            if code == 'Total':
-                ax.plot(df.index, df[code], label=label, linewidth=2.5, color='white')
-            elif code in sorted_codes:
-                ax.plot(df.index, df[code], label=label)
+            if code == ('Total', ''):
+                ax.plot(df.index, df[code], label='Total', linewidth=2.5, color='white')
+            elif code[0] in sorted_codes:
+                ax.plot(df.index, df[code], label=code[0])
             else:
-                ax.plot(df.index, df[code], label=label, linestyle='dotted', color='gray')
+                ax.plot(df.index, df[code], label=code[0], linestyle='dotted', color='gray')
         ax.set_title(f"{owner} 各股票月資產變化")
         ax.legend(ncol=5, fontsize=8)
         st.pyplot(fig)
