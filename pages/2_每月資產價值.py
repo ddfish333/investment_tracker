@@ -4,6 +4,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from modules.asset_value import calculate_monthly_asset_value
+from pandas import IndexSlice as idx
 
 # --- Streamlit Page Setup ---
 st.set_page_config(page_title="每月資產價值", layout="wide")
@@ -32,7 +33,7 @@ st.line_chart(summary_df[['Lo', 'Sean']])
 st.subheader("各股票資產跑動詳細")
 for owner in ['Lo', 'Sean']:
     st.write(f"### {owner}｜目前台幣資產：NT${summary_df[owner].iloc[-1]:,.0f}")
-    df = detail_df[owner].copy()
+    df = detail_df.loc[:, idx[owner]].copy()
     df['Total'] = df.sum(axis=1)
 
     # 排序股票：剩餘資產多的放前面
