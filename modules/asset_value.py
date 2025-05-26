@@ -5,7 +5,8 @@ from modules.price_fetcher import fetch_monthly_prices_batch, fetch_month_end_fx
 
 def calculate_monthly_asset_value(transaction_path):
     # 解析每月持股：返回三個 DataFrame (Lo, Sean, Joint) 與 codes、months
-    monthly_Lo, monthly_Sean, monthly_Joint, codes, months = parse_monthly_holdings(transaction_path)
+    monthly_Lo, monthly_Sean, monthly_Joint, codes, months, raw_df = parse_monthly_holdings(transaction_path)
+
 
     # 抓取 API 月末股價與匯率
     price_df = fetch_monthly_prices_batch(codes, months)
