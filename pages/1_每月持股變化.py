@@ -57,3 +57,4 @@ else:
         ax.set_xlabel("月份")
         ax.set_title(f"{owner} 每月股票組合")
         st.pyplot(fig)
+        

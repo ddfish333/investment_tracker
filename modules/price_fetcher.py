@@ -11,9 +11,23 @@ def fetch_monthly_prices_batch(codes, months):
     return: DataFrame(index=months, columns=codes)
     """
     start = months.min().strftime("%Y-%m-%d")
-    end = (months.max() + 1).strftime("%Y-%m-%d")  # yfinance 不含 end，所以往後一個月
+    end = (months.max() + pd.offsets.MonthEnd(1)).strftime("%Y-%m-%d")
 
-    data = yf.download(codes, start=start, end=end, interval="1mo", group_by="ticker", auto_adjust=True, progress=False)
+    # 清理代碼：去空、轉字串、去重、排序
+    codes = sorted(set(str(code).strip() for code in codes if pd.notna(code)))
+
+    print("📥 開始下載股價，代碼清單:", codes)
+
+    data = yf.download(
+        codes,
+        start=start,
+        end=end,
+        interval="1mo",
+        group_by="ticker",
+        auto_adjust=True,
+        progress=False
+    )
+
     df = pd.DataFrame(index=months)
 
     for code in codes:
@@ -21,12 +35,21 @@ def fetch_monthly_prices_batch(codes, months):
             if len(codes) == 1:
                 close = data['Close']
             else:
+                if code not in data or 'Close' not in data[code]:
+                    raise KeyError("missing 'Close' data")
                 close = data[code]['Close']
+
             close.index = close.index.to_period("M")
             df[code] = close.reindex(months).astype(float)
+
         except Exception as e:
             print(f"❌ 無法取得 {code} 的價格：{e}")
             df[code] = float('nan')
+
+    # 顯示完全沒資料的代碼
+    missing = df.columns[df.isna().all()].tolist()
+    if missing:
+        print("🚫 以下代碼完全沒有股價資料:", missing)
 
     return df
 
