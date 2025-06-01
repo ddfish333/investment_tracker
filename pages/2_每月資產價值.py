@@ -9,7 +9,7 @@ from datetime import datetime
 from modules.asset_value import calculate_monthly_asset_value
 from modules.cash_parser import parse_cash_balances, parse_cash_detail
 from modules.time_utils import to_period_index  # ✅ 導入時間處理工具
-from modules.config import TRANSACTION_FILE
+from config import TRANSACTION_FILE
 
 # --- Streamlit Page Setup ---
 st.set_page_config(page_title="每月資產價值", layout="wide")
