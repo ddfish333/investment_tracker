@@ -1,7 +1,8 @@
+# asset_value.py
 import pandas as pd
-import numpy as np
-import yfinance as yf
-import re
+from datetime import datetime
+from modules.fx_fetcher import fetch_monthly_fx
+from modules.price_fetcher import fetch_monthly_prices_batch
 
 
 def calculate_monthly_asset_value(filepath):
@@ -19,7 +20,7 @@ def calculate_monthly_asset_value(filepath):
                 shares = row['買賣股數'] * ratio
                 record['股數'] = shares
                 record['成本'] = shares * row['價格'] + row['手續費'] + row['稅金']
-                record['幣別'] = row['幣別'] if '幣別' in row else 'TWD'
+                record['幣別'] = row.get('幣別', 'TWD')
                 records.append(record)
 
     split_df = pd.DataFrame.from_records(records)
@@ -47,45 +48,37 @@ def calculate_monthly_asset_value(filepath):
     grouped['Yahoo代碼'] = grouped['股票代號'].map(ticker_map)
     grouped['幣別'] = grouped['股票代號'].map(currency_map).fillna('TWD')
 
-    price_data = {}
-    for code in grouped['Yahoo代碼'].dropna().unique():
-        try:
-            px = yf.download(code, start=df['交易日期'].min(), end=pd.Timestamp.today(), interval='1mo', progress=False)
-            close = px['Close']
-            close.index = close.index.to_period('M')
-            close = close[~close.index.duplicated(keep='last')]
-            close.name = code
-            price_data[code] = close
-        except:
-            price_data[code] = pd.Series(dtype=float, name=code)
+    today = pd.Timestamp.today()
+    today_month = pd.Period(today, freq='M')
+    if today.day == 1:
+        today_month = (today - pd.offsets.MonthBegin(1)).to_period('M')
 
-    if price_data:
-        price_df = pd.concat(price_data.values(), axis=1)
-        price_df.index.name = '月份'
-    else:
-        price_df = pd.DataFrame()
+    fx_months = pd.period_range(grouped['月份'].min(), today_month, freq='M')
+    fx_df = fetch_monthly_fx(fx_months)
+    fx_rate = fx_df.squeeze().to_dict()
 
-    fx_rate = pd.Series([30.0] * len(price_df.index), index=price_df.index)
+    price_df = fetch_monthly_prices_batch(grouped['Yahoo代碼'].dropna().unique(), fx_months)
 
-    def get_price(row):
-        ticker = row['Yahoo代碼']
+    debug_records = []
+    for idx, row in grouped.iterrows():
         month = row['月份']
-        try:
-            px = price_df.at[month, ticker]
-            return row['累計股數'] * px * (fx_rate[month] if row['幣別'] == 'USD' else 1)
-        except:
-            return 0.0
-
-    grouped['市值'] = grouped.apply(get_price, axis=1)
+        code = row['Yahoo代碼']
+        shares = row['累計股數']
+        fx = fx_rate.get(month, 30) if row['幣別'] == 'USD' else 1
+        price = price_df.at[month, code] if (month in price_df.index and code in price_df.columns) else 0
+        market_value = shares * fx * price
+        grouped.at[idx, '市值'] = market_value
+        debug_records.append({
+            '月份': month, '代號': row['股票代號'], '擁有者': row['擁有者'],
+            '股數': shares, '價格': price, '匯率': fx, '市值': market_value
+        })
 
     summary_df = grouped.groupby(['月份', '擁有者'])['市值'].sum().unstack(fill_value=0)
     summary_df['Total'] = summary_df.sum(axis=1)
 
-    def market_split(df, market_type):
-        return df[df['股票代號'].map(market_map) == market_type].groupby(['月份', '擁有者'])['市值'].sum().unstack(fill_value=0)
+    tw = grouped[grouped['股票代號'].map(market_map) == '台股'].groupby(['月份', '擁有者'])['市值'].sum().unstack(fill_value=0)
+    us = grouped[grouped['股票代號'].map(market_map) == '美股'].groupby(['月份', '擁有者'])['市值'].sum().unstack(fill_value=0)
 
-    tw = market_split(grouped, '台股')
-    us = market_split(grouped, '美股')
     for owner in ['Sean', 'Lo']:
         summary_df[f'{owner}_TW'] = tw.get(owner, 0)
         summary_df[f'{owner}_US'] = us.get(owner, 0)
@@ -100,4 +93,6 @@ def calculate_monthly_asset_value(filepath):
     monthly_Lo = detail_df.xs('Lo', level='Owner', axis=1)
     monthly_Joint = pd.DataFrame(index=monthly_Sean.index, columns=monthly_Sean.columns).fillna(0)
 
-    return summary_df, detail_df, df, monthly_Lo, monthly_Sean, monthly_Joint, price_df, detail_value_df
+    latest_debug_records = [r for r in debug_records if r['月份'] == summary_df.index.max()]
+
+    return summary_df, detail_df, df, monthly_Lo, monthly_Sean, monthly_Joint, price_df, detail_value_df, debug_records, fx_df, latest_debug_records
