@@ -4,24 +4,22 @@ import yfinance as yf
 import logging
 import os
 from datetime import datetime
-
-try:
-    from config import PRICE_SNAPSHOT_PATH
-except ImportError:
-    PRICE_SNAPSHOT_PATH = "data/monthly_price_history.parquet"
+from config import PRICE_SNAPSHOT_PATH
+from modules.time_utils import to_period_index, ensure_period_index
 
 # 設定 logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def fetch_monthly_prices_batch(codes, months):
+    # 清理輸入資料
     codes = sorted(set(str(code).strip().upper() for code in codes if code))
-    months = [pd.Period(m, freq="M") for m in months]
+    months = to_period_index(months)  # ✅ 統一轉為 PeriodIndex
 
+    # 讀取或建立價格快照資料表
     if os.path.exists(PRICE_SNAPSHOT_PATH):
         price_df = pd.read_parquet(PRICE_SNAPSHOT_PATH)
-        if not isinstance(price_df.index, pd.PeriodIndex):
-            price_df.index = pd.to_datetime(price_df.index).to_period("M")
+        price_df = ensure_period_index(price_df)  # ✅ 防止混入 timestamp index
     else:
         price_df = pd.DataFrame(index=pd.period_range(min(months), max(months), freq="M"))
 
@@ -38,6 +36,7 @@ def fetch_monthly_prices_batch(codes, months):
             if missing_months:
                 missing_codes.append(code)
 
+    # 從 Yahoo 補抓缺少資料
     if missing_codes:
         logger.info("📡 從 Yahoo 補抓缺少的代碼：%s", missing_codes)
         for code in missing_codes:
@@ -64,7 +63,7 @@ def fetch_monthly_prices_batch(codes, months):
                 except Exception as e:
                     logger.error("❌ 無法取得 %s 的價格：%s", code, e)
 
-    # ✅ PATCH: 補當月空缺，如果快照沒有最新月資料，就從上一月補一份並留空價格
+    # ✅ 補當月空白 row（避免圖表缺欄位）
     today_label = pd.Period(datetime.today(), freq="M")
     if today_label not in price_df.index:
         logger.info("🧩 補上當月空白資料：%s", today_label)

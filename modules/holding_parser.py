@@ -1,4 +1,5 @@
 import pandas as pd
+from modules.time_utils import to_period_index
 
 def parse_monthly_holdings(filepath):
     import streamlit as st  # 若你在 Streamlit 裡用，這行請保留
@@ -12,7 +13,7 @@ def parse_monthly_holdings(filepath):
 
     # 資料前處理
     df["交易日期"] = pd.to_datetime(df["交易日期"])
-    df["月份"] = df["交易日期"].dt.to_period("M")
+    df["月份"] = to_period_index(df["交易日期"])
     df["來源"] = df["備註"].fillna("其他")
     df["幣別"] = df["幣別"].fillna("TWD")
 

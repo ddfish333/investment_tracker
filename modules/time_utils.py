@@ -16,11 +16,14 @@ def ensure_period_index(df: pd.DataFrame, freq="M") -> pd.DataFrame:
 
 def to_period_index(obj, freq="M"):
     """
-    將 Series 或 Index 或 list 轉換為 PeriodIndex。
+    將 Series、Index、list 等時間資料轉換為 PeriodIndex。
+    如果傳入的是 Series，會自動略過其 index，避免 RangeIndex 錯誤。
     """
     if isinstance(obj, pd.PeriodIndex):
         return obj
-    elif isinstance(obj, (pd.DatetimeIndex, pd.Series, list)):
+    elif isinstance(obj, pd.Series):
+        return pd.to_datetime(obj.values).to_period(freq)  # ✅ 避免 Series index 被誤用
+    elif isinstance(obj, (pd.DatetimeIndex, list, pd.Index)):
         return pd.to_datetime(obj).to_period(freq)
     else:
         raise TypeError(f"❌ 無法轉換為 PeriodIndex: {type(obj)}")

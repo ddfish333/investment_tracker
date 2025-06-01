@@ -1,42 +1,44 @@
 # fx_fetcher.py
 import pandas as pd
 import os
-import sys
 import logging
-from datetime import datetime
-
-# 確保可以引用 config.py
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from config import FX_SNAPSHOT_PATH
+from modules.time_utils import to_period_index, ensure_period_index
 
 # 設定 logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def fetch_monthly_fx(months):
-    months = pd.to_datetime(months.to_timestamp()).to_period("M")
+    # 確保輸入為 PeriodIndex（freq="M"）
+    months = to_period_index(months)
 
-    # 若快照檔存在，先讀入
+    # 若快照檔存在，先讀入，否則新建空表
     if os.path.exists(FX_SNAPSHOT_PATH):
         fx_df = pd.read_parquet(FX_SNAPSHOT_PATH)
-        fx_df.index = pd.to_datetime(fx_df.index).to_period("M")
+        fx_df = ensure_period_index(fx_df)
+
+        # ✅ 若缺少 USD 欄位，自動補上
+        if "USD" not in fx_df.columns:
+            fx_df["USD"] = pd.NA
     else:
         fx_df = pd.DataFrame(columns=["USD"], index=pd.period_range(min(months), max(months), freq="M"))
 
+    # 整理出缺少的月份
     fx_df = fx_df.copy()
     needed_months = pd.period_range(min(months), max(months), freq="M")
 
-    missing_months = []
-    for m in needed_months:
-        if m not in fx_df.index or pd.isna(fx_df.at[m, "USD"]):
-            missing_months.append(m)
+    missing_months = [m for m in needed_months if m not in fx_df.index or pd.isna(fx_df.at[m, "USD"])]
 
+    # 補上缺的匯率資料（暫用固定值 30.0）
     for month in missing_months:
-        # 實際上建議這邊改為查詢央行或提供匯率API，如此處簡化為固定匯率（示意）
         fx_df.loc[month, "USD"] = 30.0
         logger.info(f"✅ 匯率資料補齊：{month} ➔ 30.0")
 
+    # 對齊格式與順序
     fx_df = fx_df.reindex(index=needed_months).sort_index()
+
+    # 儲存快照
     fx_df.to_parquet(FX_SNAPSHOT_PATH)
     logger.info(f"💾 匯率快照已儲存至：{FX_SNAPSHOT_PATH}")
 

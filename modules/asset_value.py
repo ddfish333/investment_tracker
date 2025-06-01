@@ -3,12 +3,16 @@ import pandas as pd
 from datetime import datetime
 from modules.fx_fetcher import fetch_monthly_fx
 from modules.price_fetcher import fetch_monthly_prices_batch
+from modules.time_utils import to_period_index, ensure_period_index
 
 
 def calculate_monthly_asset_value(filepath):
     df = pd.read_excel(filepath)
-    df['交易日期'] = pd.to_datetime(df['交易日期'])
-    df['月份'] = df['交易日期'].dt.to_period('M')
+    df['交易日期'] = pd.to_datetime(df['交易日期'])  # 保留原始欄位
+    print("🔍 type(df['交易日期']):", type(df['交易日期'])) #抓Bug
+    print("🔍 df['交易日期'].dtype:", df['交易日期'].dtype) #抓Bug
+    print("🔍 df['交易日期'].head():\n", df['交易日期'].head()) #抓Bug
+    df['月份'] = to_period_index(df['交易日期'])
     df['股票代號'] = df['股票代號'].astype(str)
 
     records = []
