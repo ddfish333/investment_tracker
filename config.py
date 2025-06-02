@@ -10,5 +10,9 @@ FX_SNAPSHOT_PATH = "data/monthly_fx_history.parquet"
 # 交易紀錄 Excel 檔案路徑
 TRANSACTION_FILE = "data/transactions.xlsx"
 
+# 現金帳戶資料
+CASH_ACCOUNT_FILE = "data/cash_accounts.xlsx"
+CASH_ACCOUNT_SHEET = "monthly_balance"
+
 # 可加上更多參數設定
 # 例如：LOG_LEVEL = "INFO", DEFAULT_FX_RATE = 30.0

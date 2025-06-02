@@ -1,8 +1,34 @@
-# time_utils.py
 import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
+
+def to_period_index(obj, freq="M", column=None):
+    """
+    將 Series、Index、list 或 DataFrame 的特定欄位轉換為 PeriodIndex。
+    - 若傳入的是 Series、Index、list，則轉換為 PeriodIndex 回傳
+    - 若傳入的是 DataFrame 且指定欄位，則將該欄轉為 Period
+    """
+    if isinstance(obj, (pd.PeriodIndex, pd.arrays.PeriodArray)):
+        return obj
+    elif isinstance(obj, pd.Series):
+        return pd.to_datetime(obj.values).to_period(freq)
+    elif isinstance(obj, pd.DataFrame):
+        if column and column in obj.columns:
+            # 🔒 防止你對已經是 Period 的欄位重複轉換
+            if not pd.api.types.is_period_dtype(obj[column]):
+                if pd.api.types.is_datetime64_any_dtype(obj[column]):
+                    obj[column] = obj[column].dt.to_period(freq)
+                else:
+                    obj[column] = pd.to_datetime(obj[column]).dt.to_period(freq)
+            return obj
+        else:
+            raise ValueError(f"❌ DataFrame 必須指定 column 欄位才可轉換為 Period: {column}")
+    elif isinstance(obj, (pd.DatetimeIndex, list, pd.Index)):
+        return pd.to_datetime(obj).to_period(freq)
+    else:
+        raise TypeError(f"❌ 無法轉換為 PeriodIndex: {type(obj)}")
+
 
 def ensure_period_index(df: pd.DataFrame, freq="M") -> pd.DataFrame:
     """
@@ -14,35 +40,12 @@ def ensure_period_index(df: pd.DataFrame, freq="M") -> pd.DataFrame:
         df.index = pd.to_datetime(df.index).to_period(freq)
     return df
 
-def to_period_index(obj, freq="M"):
+def get_today_period():
     """
-    將 Series、Index、list 等時間資料轉換為 PeriodIndex。
-    如果傳入的是 Series，會自動略過其 index，避免 RangeIndex 錯誤。
+    傳回今天所屬月份的 Period(M) 格式。
+    若今天是 1 號，則回傳上個月。
     """
-    if isinstance(obj, pd.PeriodIndex):
-        return obj
-    elif isinstance(obj, pd.Series):
-        return pd.to_datetime(obj.values).to_period(freq)  # ✅ 避免 Series index 被誤用
-    elif isinstance(obj, (pd.DatetimeIndex, list, pd.Index)):
-        return pd.to_datetime(obj).to_period(freq)
-    else:
-        raise TypeError(f"❌ 無法轉換為 PeriodIndex: {type(obj)}")
-
-def to_timestamp(obj):
-    """
-    將 Period 或 PeriodIndex 轉回 Timestamp 或 DatetimeIndex。
-    用於抓取資料時與外部 API 相容。
-    """
-    if isinstance(obj, pd.PeriodIndex):
-        return obj.to_timestamp()
-    elif isinstance(obj, pd.Period):
-        return obj.to_timestamp()
-    else:
-        raise TypeError(f"❌ 非 Period 資料，無法轉換為 Timestamp: {type(obj)}")
-
-def period_label(p: pd.Period) -> str:
-    """
-    將 Period（例如 Period('2023-06')）轉成字串 "2023-06"
-    可用於顯示或存檔命名。
-    """
-    return str(p)
+    today = pd.Timestamp.today()
+    if today.day == 1:
+        return (today - pd.offsets.MonthBegin(1)).to_period("M")
+    return today.to_period("M")
