@@ -1,3 +1,4 @@
+#module/asset_value.py
 # -*- coding: utf-8 -*-
 import pandas as pd
 from modules.fx_fetcher import fetch_monthly_fx
@@ -5,7 +6,6 @@ from modules.price_fetcher import fetch_monthly_prices_batch
 from modules.time_utils import to_period_index, get_today_period
 from modules.transaction_parser import parse_transaction
 from modules.cash_parser import parse_cash_balances
-
 
 def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None):
     # --- 處理股票交易資料 ---
@@ -60,7 +60,6 @@ def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None):
     grouped['市值'] = grouped.apply(calculate_market_value, axis=1)
 
     summary_stock_df = grouped.groupby(['月份', '出資者'])['市值'].sum().unstack(fill_value=0)
-    summary_stock_df['Total'] = summary_stock_df.sum(axis=1)
 
     tw = grouped[grouped['股票代號'].map(market_map) == '台股'].groupby(['月份', '出資者'])['市值'].sum().unstack(fill_value=0)
     us = grouped[grouped['股票代號'].map(market_map) == '美股'].groupby(['月份', '出資者'])['市值'].sum().unstack(fill_value=0)
@@ -85,6 +84,18 @@ def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None):
         summary_cash_df = pd.DataFrame(index=all_months)
 
     # --- 合併股票與現金為總資產 ---
-    summary_total_df = summary_stock_df.add(summary_cash_df, fill_value=0)
+    summary_df = summary_stock_df.add(summary_cash_df, fill_value=0)
 
-    return summary_total_df, summary_stock_df, summary_cash_df, df, stock_price_df, stock_value_df, fx_df, all_months
+    # --- 重算每位出資者的總資產欄位（股票 + 現金） ---
+    for owner in all_owners:
+        summary_df[owner] = (
+            summary_df.get(f'{owner}_TW_STOCK', 0)
+            + summary_df.get(f'{owner}_US_STOCK', 0)
+            + summary_df.get(f'{owner}_TWD_CASH', 0)
+            + summary_df.get(f'{owner}_USD_CASH', 0)
+        )
+
+    # --- 重算 Total 欄位為 Sean + Lo ---
+    summary_df['Total'] = summary_df[all_owners].sum(axis=1)
+
+    return summary_df, summary_stock_df, summary_cash_df, df, stock_price_df, stock_value_df, fx_df, all_months

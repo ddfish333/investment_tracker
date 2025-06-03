@@ -14,5 +14,7 @@ TRANSACTION_FILE = "data/transactions.xlsx"
 CASH_ACCOUNT_FILE = "data/cash_accounts.xlsx"
 CASH_ACCOUNT_SHEET = "monthly_balance"
 
+
+MONTHLY_PRICE_PATH = "data/monthly_price_history.parquet"
 # 可加上更多參數設定
 # 例如：LOG_LEVEL = "INFO", DEFAULT_FX_RATE = 30.0
