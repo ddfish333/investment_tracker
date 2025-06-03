@@ -1,18 +1,33 @@
-# app.py
 import streamlit as st
+import time
+import random
 
 st.set_page_config(layout="wide")
-st.title("📊 投資追蹤系統首頁")
+st.title("資產怪獸 ASSET MONSTER")
+
+# --- 動態小動畫模擬 ---
+with st.empty():
+    for i in range(20):
+        eye = random.choice(["👀", "🧿", "👁️"])
+        mouth = random.choice(["🦷", "👄", "🫦"])
+        face = f"**Asset Monster is waking up... {eye}{mouth}{eye}**"
+        st.markdown(face)
+        time.sleep(0.1)
 
 st.markdown("""
-歡迎使用你的投資追蹤分析平台 👋  
-請透過左側選單選擇要進行的分析功能。
+### 🧠 Asset Monster: Tame Your Portfolio
 
----
+Meet Asset Monster — your intelligent financial tracker.  
+It devours your stocks, cash, and foreign currency, then spits out clean, actionable insights.
 
-### 可用功能：
-- 每月持股變化（疊加直方圖）
-- 每月資產價值（台幣換算）
-- 每月股票價格查詢（2330 & TSLA 範例）
-- 年度損益分析（開發中）
+- 📈 Real-time asset monitoring  
+- 💱 Multi-currency automatic valuation  
+- 📊 Intuitive visual breakdowns for clarity and control  
+- 🔍 Zoom in on details or view the big picture — anytime
+
+Whether you’re managing your personal empire or just starting to track your wealth, Asset Monster gives you structure without the spreadsheet chaos.
+
+> It's not just about tracking. It's about mastering.
+
+Scroll down and let the Beast crunch the numbers. You feed it data — it feeds you back control.
 """)

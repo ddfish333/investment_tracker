@@ -1,5 +1,4 @@
-#module/asset_value.py
-# -*- coding: utf-8 -*-
+from dataclasses import dataclass
 import pandas as pd
 from modules.fx_fetcher import fetch_monthly_fx
 from modules.price_fetcher import fetch_monthly_prices_batch
@@ -7,18 +6,25 @@ from modules.time_utils import to_period_index, get_today_period
 from modules.transaction_parser import parse_transaction
 from modules.cash_parser import parse_cash_balances
 
-def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None):
-    # --- 處理股票交易資料 ---
+@dataclass
+class AssetValueResult:
+    summary_df: pd.DataFrame
+    summary_stock_df: pd.DataFrame
+    summary_cash_df: pd.DataFrame
+    raw_df: pd.DataFrame
+    stock_price_df: pd.DataFrame
+    stock_value_df: pd.DataFrame
+    fx_df: pd.DataFrame
+    all_months: pd.PeriodIndex
+
+def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None) -> AssetValueResult:
     df = parse_transaction(filepath_main=filepath_transaction, filepath_ownership=filepath_transaction)
     df = to_period_index(df, column='月份')
 
     today_month = get_today_period()
     all_months = pd.period_range(df['月份'].min(), today_month, freq='M')
 
-    grouped = df.groupby(['月份', '股票代號', '出資者']).agg({
-        '股數': 'sum',
-        '成本': 'sum'
-    }).reset_index()
+    grouped = df.groupby(['月份', '股票代號', '出資者']).agg({'股數': 'sum', '成本': 'sum'}).reset_index()
 
     all_owners = sorted(df['出資者'].unique())
     full_index = pd.MultiIndex.from_product([
@@ -77,16 +83,13 @@ def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None):
     ).fillna(0)
     stock_value_df.columns.name = None
 
-    # --- 現金資料處理 ---
     if filepath_cash:
         summary_cash_df = parse_cash_balances(filepath=filepath_cash)
     else:
         summary_cash_df = pd.DataFrame(index=all_months)
 
-    # --- 合併股票與現金為總資產 ---
     summary_df = summary_stock_df.add(summary_cash_df, fill_value=0)
 
-    # --- 重算每位出資者的總資產欄位（股票 + 現金） ---
     for owner in all_owners:
         summary_df[owner] = (
             summary_df.get(f'{owner}_TW_STOCK', 0)
@@ -95,7 +98,15 @@ def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None):
             + summary_df.get(f'{owner}_USD_CASH', 0)
         )
 
-    # --- 重算 Total 欄位為 Sean + Lo ---
     summary_df['Total'] = summary_df[all_owners].sum(axis=1)
 
-    return summary_df, summary_stock_df, summary_cash_df, df, stock_price_df, stock_value_df, fx_df, all_months
+    return AssetValueResult(
+        summary_df=summary_df,
+        summary_stock_df=summary_stock_df,
+        summary_cash_df=summary_cash_df,
+        raw_df=df,
+        stock_price_df=stock_price_df,
+        stock_value_df=stock_value_df,
+        fx_df=fx_df,
+        all_months=all_months
+    )

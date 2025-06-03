@@ -8,7 +8,17 @@ from config import TRANSACTION_FILE
 st.set_page_config(page_title="DEBUG 資產表", layout="wide")
 
 # --- 資料計算 ---
-summary_df, summary_stock_df, summary_cash_df, raw_df, stock_price_df, stock_value_df, fx_df, all_months = calculate_monthly_asset_value(TRANSACTION_FILE)
+result = calculate_monthly_asset_value(TRANSACTION_FILE)
+summary_df = result.summary_df
+summary_stock_df = result.summary_stock_df
+summary_cash_df = result.summary_cash_df
+raw_df = result.raw_df
+stock_price_df = result.stock_price_df
+stock_value_df = result.stock_value_df
+fx_df = result.fx_df
+all_months = result.all_months
+
+
 
 # --- 現金資料計算 ---
 cash_summary = parse_cash_balances()
@@ -32,13 +42,14 @@ st.subheader("📈 summary_df（每人每月總資產）")
 st.dataframe(summary_df[::-1].style.format("{:,.0f}"))
 
 # --- 顯示 stock_value_df ---
-st.subheader("📊 stock_value_df（每人每月每股票市值）")
-st.dataframe(stock_value_df[::-1].style.format("{:,.0f}"))
+st.subheader("📊 stock_value_df（目前仍有持股者的股票市值）")
+latest_row = stock_value_df.iloc[-1]# 抓最後一列（最新月份） > 0 的欄位
+active_columns = latest_row[latest_row > 0].index.tolist()
 
+# 篩選出目前有持股的股票
+filtered_stock_value_df = stock_value_df[active_columns]
+
+st.dataframe(filtered_stock_value_df[::-1].style.format("{:,.0f}"))
 # --- 顯示 cash_summary ---
 st.subheader("💵 cash_summary（每人每月現金資產）")
 st.dataframe(cash_summary[::-1].style.format("{:,.0f}"))
-
-# --- 顯示 total_asset_df ---
-st.subheader("🧾 total_asset_df（股票＋現金的整合資產表）")
-st.dataframe(total_asset_df[::-1].style.format("{:,.0f}"))
