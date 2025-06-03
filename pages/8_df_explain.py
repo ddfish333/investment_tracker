@@ -16,6 +16,17 @@ cash_summary = parse_cash_balances()
 # --- 合併成 total_asset_df（每人每月每資產類型）---
 total_asset_df = pd.concat([stock_value_df, cash_summary], axis=1).fillna(0)
 
+# --- 顯示目前每人每股票剩餘股數 ---
+st.subheader("📌 每人每股票目前持股數量（依 raw_df 計算）")
+latest_shares = (
+    raw_df.groupby(['出資者', '股票代號'])['股數']
+    .sum()
+    .reset_index()
+    .query("股數 != 0")
+    .sort_values(['出資者', '股票代號'])
+)
+st.dataframe(latest_shares)
+
 # --- 顯示 summary_df ---
 st.subheader("📈 summary_df（每人每月總資產）")
 st.dataframe(summary_df[::-1].style.format("{:,.0f}"))
@@ -36,11 +47,10 @@ st.dataframe(total_asset_df[::-1].style.format("{:,.0f}"))
 st.subheader("📗 stock_price_df（每月股票價格快照）")
 st.dataframe(stock_price_df.sort_index(ascending=False).style.format("{:,.2f}"))
 
+# --- 顯示 raw_df ---
+st.subheader("📒 raw_df（parse_transaction後的DataFrame）")
+st.dataframe(raw_df.reset_index(drop=True)[::-1])
+
 # --- 顯示 fx_df ---
 st.subheader("📘 fx_df（每月匯率）")
 st.dataframe(fx_df.sort_index(ascending=False).style.format("{:,.2f}"))
-
-# --- 顯示 raw_df ---
-st.subheader("📒 raw_df（parse_transaction後的DataFrame）")
-st.dataframe(raw_df[::-1])
-

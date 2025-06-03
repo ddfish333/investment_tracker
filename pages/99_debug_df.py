@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from modules.parse_transaction import parse_transaction
+from modules.transaction_parser import parse_transaction
 
 st.set_page_config(page_title="Debug parse_transaction", layout="wide")
 st.title("🧪 parse_transaction() Debug 工具")

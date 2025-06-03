@@ -3,10 +3,13 @@ import pandas as pd
 from modules.fx_fetcher import fetch_monthly_fx
 from modules.price_fetcher import fetch_monthly_prices_batch
 from modules.time_utils import to_period_index, get_today_period
-from modules.parse_transaction import parse_transaction
+from modules.transaction_parser import parse_transaction
+from modules.cash_parser import parse_cash_balances
 
-def calculate_monthly_asset_value(filepath):
-    df = parse_transaction(filepath_main=filepath, filepath_ownership=filepath)
+
+def calculate_monthly_asset_value(filepath_transaction, filepath_cash=None):
+    # --- 處理股票交易資料 ---
+    df = parse_transaction(filepath_main=filepath_transaction, filepath_ownership=filepath_transaction)
     df = to_period_index(df, column='月份')
 
     today_month = get_today_period()
@@ -56,15 +59,15 @@ def calculate_monthly_asset_value(filepath):
 
     grouped['市值'] = grouped.apply(calculate_market_value, axis=1)
 
-    summary_df = grouped.groupby(['月份', '出資者'])['市值'].sum().unstack(fill_value=0)
-    summary_df['Total'] = summary_df.sum(axis=1)
+    summary_stock_df = grouped.groupby(['月份', '出資者'])['市值'].sum().unstack(fill_value=0)
+    summary_stock_df['Total'] = summary_stock_df.sum(axis=1)
 
     tw = grouped[grouped['股票代號'].map(market_map) == '台股'].groupby(['月份', '出資者'])['市值'].sum().unstack(fill_value=0)
     us = grouped[grouped['股票代號'].map(market_map) == '美股'].groupby(['月份', '出資者'])['市值'].sum().unstack(fill_value=0)
 
     for owner in all_owners:
-        summary_df[f'{owner}_TW_STOCK'] = tw.get(owner, 0)
-        summary_df[f'{owner}_US_STOCK'] = us.get(owner, 0)
+        summary_stock_df[f'{owner}_TW_STOCK'] = tw.get(owner, 0)
+        summary_stock_df[f'{owner}_US_STOCK'] = us.get(owner, 0)
 
     grouped['股票ID'] = grouped['出資者'] + '_' + grouped['股票代號']
     stock_value_df = grouped.pivot_table(
@@ -75,4 +78,13 @@ def calculate_monthly_asset_value(filepath):
     ).fillna(0)
     stock_value_df.columns.name = None
 
-    return summary_df, df, stock_price_df, stock_value_df, fx_df, all_months
+    # --- 現金資料處理 ---
+    if filepath_cash:
+        summary_cash_df = parse_cash_balances(filepath=filepath_cash)
+    else:
+        summary_cash_df = pd.DataFrame(index=all_months)
+
+    # --- 合併股票與現金為總資產 ---
+    summary_total_df = summary_stock_df.add(summary_cash_df, fill_value=0)
+
+    return summary_total_df, summary_stock_df, summary_cash_df, df, stock_price_df, stock_value_df, fx_df, all_months

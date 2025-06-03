@@ -7,15 +7,14 @@ import matplotlib.font_manager as fm
 import pandas as pd
 from datetime import datetime
 from modules.asset_value import calculate_monthly_asset_value
-from modules.cash_parser import parse_cash_balances, parse_cash_detail
-from modules.time_utils import to_period_index  # ✅ 導入時間處理工具
-from config import TRANSACTION_FILE, FX_SNAPSHOT_PATH
+from modules.time_utils import to_period_index
+from config import TRANSACTION_FILE, CASH_ACCOUNT_FILE, FX_SNAPSHOT_PATH
 
 # --- Streamlit Page Setup ---
 st.set_page_config(page_title="每月資產價值", layout="wide")
 
 # 設定中文字體（根據作業系統自動調整）
-if platform.system() == "Darwin":  # macOS
+if platform.system() == "Darwin":
     font_path = "/System/Library/Fonts/STHeiti Medium.ttc"
 elif platform.system() == "Windows":
     font_path = "C:/Windows/Fonts/msjh.ttc"
@@ -29,42 +28,42 @@ else:
     plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['axes.unicode_minus'] = False
 
-# --- 計算資產 ---
-summary_df, raw_df, stock_price_df, stock_value_df, fx_df, all_months = calculate_monthly_asset_value(TRANSACTION_FILE)
+# --- 小工具函式：安全取最後一筆資料 ---
+def safe_last(df, col_name):
+    try:
+        return df[col_name].iloc[-1]
+    except (KeyError, IndexError):
+        st.warning(f"⚠️ 找不到或無資料：{col_name}")
+        return 0
 
-# --- 銀行帳戶資產 ---
-cash_summary = parse_cash_balances()
-cash_latest = cash_summary.iloc[-1]
+# --- 資料計算：股票 + 現金 ---
+summary_df, summary_stock_df, summary_cash_df, raw_df, stock_price_df, stock_value_df, fx_df, all_months = calculate_monthly_asset_value(
+    filepath_transaction=TRANSACTION_FILE,
+    filepath_cash=CASH_ACCOUNT_FILE
+)
 
-summary_df_display = summary_df.join(cash_summary, how="left").fillna(0)
-owners = [col for col in summary_df.columns if not col.endswith("_TW_STOCK") and not col.endswith("_US_STOCK") and not col.endswith("_TWD_CASH") and not col.endswith("_USD_CASH") and not col.endswith("_TOTAL") and col != "Total"]
-for owner in owners:
-    summary_df_display[f"{owner}_TOTAL"] = (
-        summary_df_display.get(f"{owner}_TW_STOCK", 0)
-        + summary_df_display.get(f"{owner}_US_STOCK", 0)
-        + summary_df_display.get(f"{owner}_TWD_CASH", 0)
-        + summary_df_display.get(f"{owner}_USD_CASH", 0)
-    )
+# --- 使用 summary_df 作為統一總資產來源，summary_df_display 僅作為顯示版本 ---
+summary_df_display = summary_df.copy()
+summary_df_display.index = summary_df_display.index.astype(str)
 
-# --- 建立 total_asset_df：每人每資產類型（個股/現金）為欄位的 DataFrame ---
-total_asset_df = pd.concat([stock_value_df, cash_summary], axis=1).fillna(0)
+# --- 自動抓出資者名稱：只抓 base 欄位名（無底線） ---
+owners = [col for col in summary_df.columns if col not in ("Total") and "_" not in col]
 
 # --- 顯示資產摘要 ---
-st.title(f"\U0001F4B8 每月資產價值")
+st.title(f"\U0001F4B8 我想和你一起慢慢變富")
 latest = summary_df_display.iloc[-1]
 for owner in owners:
-    tw_stock = latest.get(f"{owner}_TW_STOCK", 0)
-    us_stock = latest.get(f"{owner}_US_STOCK", 0)
-    tw_cash = latest.get(f"{owner}_TWD_CASH", 0)
-    us_cash = latest.get(f"{owner}_USD_CASH", 0)
+    tw_stock = safe_last(summary_df, f"{owner}_TW_STOCK")
+    us_stock = safe_last(summary_df, f"{owner}_US_STOCK")
+    tw_cash = safe_last(summary_cash_df, f"{owner}_TWD_CASH")
+    us_cash = safe_last(summary_cash_df, f"{owner}_USD_CASH")
     total = tw_stock + us_stock + tw_cash + us_cash
     st.markdown(f"**{owner}**：TWD {total:,.0f}（台股 TWD {tw_stock:,.0f}／美股 TWD {us_stock:,.0f}／台幣現金 TWD {tw_cash:,.0f}／美金現金 TWD {us_cash:,.0f}）")
 
-st.markdown(f"**Sean&Lo**：TWD {summary_df['Total'].iloc[-1] + cash_latest.sum():,.0f}")
+st.markdown(f"**Sean&Lo**：TWD {summary_df['Total'].iloc[-1]:,.0f}")
 
-# --- 總資產跑動 ---
+# --- 總資產跑動（用 summary_df） ---
 st.subheader("Sean&Lo總資產")
-summary_df_display.index = summary_df_display.index.astype(str)
 default_selection = ['Sean', 'Lo', 'Total']
 selected_lines = st.multiselect("請選擇要顯示的資產線", options=default_selection, default=default_selection)
 if selected_lines:
@@ -73,8 +72,10 @@ else:
     st.info("請至少選擇一條資產線來顯示。")
 
 # --- 各類資產跑動詳細（含股票與現金） ---
-st.subheader("各類資產跑動詳細（含股票與現金）")
-for owner in ["Sean", "Lo"]:
+st.subheader("各類資產跑動詳細(含股票與現金)")
+total_asset_df = pd.concat([stock_value_df, summary_cash_df], axis=1).fillna(0)
+
+for owner in owners:
     columns = [col for col in total_asset_df.columns if col.startswith(owner + "_")]
     df = total_asset_df[columns].copy()
     if df.empty:
@@ -89,10 +90,9 @@ for owner in ["Sean", "Lo"]:
     st.markdown(f"#### {owner} 每月資產變化（目前資產 NT${summary_df.iloc[-1].get(owner, 0):,.0f} 元）")
     st.bar_chart(df)
 
-# --- 額外資訊表格 ---
+# --- 資料表顯示 ---
 st.subheader("📊 整合後每月資產資料表")
-summary_df_display = summary_df_display[::-1]
-st.dataframe(summary_df_display.style.format("{:,.0f}"))
+st.dataframe(summary_df_display[::-1].style.format("{:,.0f}"))
 
 # --- 美金匯率變化 ---
 st.subheader("📈 美金匯率變化")
