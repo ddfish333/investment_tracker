@@ -8,9 +8,17 @@ import pandas as pd
 from datetime import datetime
 from modules.asset_value import calculate_monthly_asset_value
 from config import TRANSACTION_FILE, CASH_ACCOUNT_FILE, FX_SNAPSHOT_PATH
+from modules.price_refresher import refresh_current_month_prices
+
+
 
 # --- Streamlit Page Setup ---
 st.set_page_config(page_title="每月資產價值", layout="wide")
+
+#更新最新股價
+if st.button("🔁 重新抓取當月股價（即時快照）"):
+    refresh_current_month_prices(['2330.TW', 'NVDA', 'AAPL'])  # ← 改成你常用的代碼
+    st.success("✅ 已重新抓取當月股價並更新快照")
 
 # 設定中文字體（根據作業系統自動調整）
 if platform.system() == "Darwin":
