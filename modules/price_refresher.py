@@ -72,7 +72,7 @@ def refresh_current_month_prices(codes):
     # 儲存 parquet
     if not stock_price_df.empty:
         os.makedirs(os.path.dirname(PRICE_SNAPSHOT_PATH), exist_ok=True)
-        stock_price_df = stock_price_df.astype("float64")
+        stock_price_df.at[current_month, "資料日期"] = pd.Timestamp.today()#補上資料日期
         stock_price_df.to_parquet(PRICE_SNAPSHOT_PATH)
         logger.info("📀 已更新價格快照至：%s", PRICE_SNAPSHOT_PATH)
 

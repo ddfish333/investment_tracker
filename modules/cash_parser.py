@@ -1,14 +1,7 @@
 import pandas as pd
 from modules.time_utils import to_period_index, get_today_period
+from modules.fx_fetcher import load_fx_rates
 from config import CASH_ACCOUNT_FILE, CASH_ACCOUNT_SHEET, FX_SNAPSHOT_PATH
-
-
-def load_fx_rates():
-    fx_df = pd.read_parquet(FX_SNAPSHOT_PATH)
-    fx_df.index = to_period_index(fx_df.index)
-    fx_long = fx_df.stack().reset_index()
-    fx_long.columns = ["Month", "Currency", "Rate"]
-    return fx_long.set_index(["Month", "Currency"])["Rate"]
 
 
 def parse_cash_balances(filepath=CASH_ACCOUNT_FILE, sheet_name=CASH_ACCOUNT_SHEET):
@@ -91,17 +84,8 @@ def get_latest_cash_detail(filepath=CASH_ACCOUNT_FILE, sheet_name=CASH_ACCOUNT_S
 
     df["TWD金額"] = df.apply(convert, axis=1)
     df["金額分攤"] = df["TWD金額"] * df["出資比例"]
+    df["分類"] = df["帳戶類型"]
 
-    def classify(row):
-        acct = row["帳戶"]
-        if acct == "First Trade":
-            return "美股現金"
-        elif "定存" in acct:
-            return "美股定存"
-        else:
-            return "台幣現金"
-
-    df["分類"] = df.apply(classify, axis=1)
 
     result = df.groupby(["月份", "擁有者", "銀行", "帳戶", "分類", "幣別"], as_index=False).agg({
         "金額": "sum",

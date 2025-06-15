@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 from modules.asset_value import calculate_monthly_asset_value
-from modules.cash_parser import parse_cash_balances
+from modules.cash_parser import parse_cash_balances, get_latest_cash_detail
 from config import TRANSACTION_FILE
 
 st.set_page_config(page_title="DEBUG 資產表", layout="wide")
@@ -53,3 +53,22 @@ st.dataframe(filtered_stock_value_df[::-1].style.format("{:,.0f}"))
 # --- 顯示 cash_summary ---
 st.subheader("💵 cash_summary（每人每月現金資產）")
 st.dataframe(cash_summary[::-1].style.format("{:,.0f}"))
+
+# --- 顯示 raw_df ---
+# 自動選出數值欄位
+st.subheader("raw_df (讀取transaction後轉為df)")
+float_cols = raw_df.select_dtypes(include='number').columns
+# 只格式化這些欄位
+st.dataframe(raw_df[::-1].style.format({col: "{:,.0f}" for col in float_cols}))
+
+# --- 顯示 latest_cash_detail ---
+st.subheader("🧾 get_latest_cash_detail()（最新月份的現金帳戶細節）")
+try:
+    latest_cash_detail_df = get_latest_cash_detail()
+    float_cols = latest_cash_detail_df.select_dtypes(include='number').columns
+    st.dataframe(latest_cash_detail_df.style.format({col: "{:,.0f}" for col in float_cols}))
+except Exception as e:
+    st.error(f"❌ 無法載入最新現金帳戶資料：{e}")
+
+
+
