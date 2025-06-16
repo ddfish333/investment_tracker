@@ -72,13 +72,16 @@ st.dataframe(
 
 # --- 資產總和 ---
 holdings['市場類別_TWD'] = holdings['幣別'].map({'TWD': '台股資產(TWD)', 'USD': '美股資產(TWD)'})
-holdings['市場類別_USD'] = holdings['幣別'].map({'USD': '美股資產(USD)'}).fillna('')
+holdings['市場類別_USD'] = holdings['幣別'].map({'USD': '美股資產(USD)'})
 
 summary_TWD = holdings.groupby(['出資者', '市場類別_TWD'])['市值（TWD）'].sum().unstack(fill_value=0)
 summary_USD = holdings.groupby(['出資者', '市場類別_USD'])['市值（原幣）'].sum().unstack(fill_value=0)
+summary_USD = holdings.dropna(subset=['市場類別_USD']) \
+    .groupby(['出資者', '市場類別_USD'])['市值（原幣）'].sum().unstack(fill_value=0)
 
 # 修正空欄位名稱為美股資產(USD)
-summary_USD = summary_USD.rename(columns={col: "美股資產(USD)" if col == '' else col for col in summary_USD.columns})
+# 預設就不產生空欄位，因此不需要 rename
+pass
 
 # 移除重複欄位再 join
 if "美股資產(USD)" in summary_TWD.columns:
@@ -101,7 +104,7 @@ summary['美金定存(USD)'] = summary['出資者'].map(lambda x: cash_df_summar
 summary['美金定存(TWD)'] = summary['美金定存(USD)'] * fx_rate_value
 summary['台幣現金(TWD)'] = summary['出資者'].map(lambda x: cash_df_summary.loc[x, ['台幣活存', '台幣投資帳戶']].sum() if x in cash_df_summary.index else 0)
 
-# 加入總資產（TWD）
+# --- 加入總資產（TWD） ---
 summary['總資產(TWD)'] = (
     summary.get('台股資產(TWD)', 0) +
     summary.get('美股資產(TWD)', 0) +
@@ -110,11 +113,23 @@ summary['總資產(TWD)'] = (
     summary.get('台幣現金(TWD)', 0)
 )
 
-# 加入 Total 總和列
-total_row = {col: summary[col].sum() if pd.api.types.is_numeric_dtype(summary[col]) else 'Total' for col in summary.columns}
+# --- 總和列處理區塊 PATCH ---
+
+# Debug: 檢查欄位是否唯一
+if not summary.columns.is_unique:
+    st.warning(f"⚠️ summary 欄位名稱出現重複，將自動去除：{summary.columns[summary.columns.duplicated()].tolist()}")
+    summary = summary.loc[:, ~summary.columns.duplicated()]  # 移除重複欄位
+
+# 建立總和列
+float_cols = summary.select_dtypes(include='number').columns
+
+# 避免非數字欄位被誤加總，例如出資者/擁有者
+total_row = {col: summary[col].sum() if col in float_cols else 'Total' for col in summary.columns}
+
+# ✅ 直接 concat，不使用 ParserBase 去 dedup（避免 AttributeError）
 summary = pd.concat([summary, pd.DataFrame([total_row])], ignore_index=True)
 
-float_cols = summary.select_dtypes(include='number').columns
+# 顯示
 st.dataframe(summary.style.format({col: "{:,.0f}" for col in float_cols}))
 
 # --- 現金細項分類表格 ---

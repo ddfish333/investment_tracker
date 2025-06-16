@@ -1,119 +1,122 @@
+#pages/2_每月資產價值.py
+import os
+import platform
 import streamlit as st
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import pandas as pd
 from datetime import datetime
-import yfinance as yf
-import plotly.express as px
 from modules.asset_value import calculate_monthly_asset_value
-from modules.fx_fetcher import get_latest_fx_rate
-from config import TRANSACTION_FILE, PRICE_SNAPSHOT_PATH, CASH_ACCOUNT_FILE
-from modules.cash_parser import get_latest_cash_detail, parse_cash_balances
+from config import TRANSACTION_FILE, CASH_ACCOUNT_FILE, FX_SNAPSHOT_PATH
+from modules.price_refresher import refresh_current_month_prices
 
-# --- 頁面設定 ---
-st.set_page_config(page_title="目前持股與現金", layout="wide")
 
-# --- 載入資料（改為完整結果物件） ---
+
+# --- Streamlit Page Setup ---
+st.set_page_config(page_title="每月資產價值", layout="wide")
+
+#更新最新股價
+if st.button("🔁 重新抓取當月股價（即時快照）"):
+    refresh_current_month_prices(['2330.TW', 'NVDA', 'AAPL'])  # ← 改成你常用的代碼
+    st.success("✅ 已重新抓取當月股價並更新快照")
+
+# 設定中文字體（根據作業系統自動調整）
+if platform.system() == "Darwin":
+    font_path = "/System/Library/Fonts/STHeiti Medium.ttc"
+elif platform.system() == "Windows":
+    font_path = "C:/Windows/Fonts/msjh.ttc"
+else:
+    font_path = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
+
+if os.path.exists(font_path):
+    prop = fm.FontProperties(fname=font_path)
+    plt.rcParams['font.family'] = prop.get_name()
+else:
+    plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['axes.unicode_minus'] = False
+
+# --- 小工具函式：安全取最後一筆資料 ---
+def safe_last(df, col_name):
+    try:
+        return df[col_name].iloc[-1]
+    except (KeyError, IndexError):
+        st.warning(f"⚠️ 找不到或無資料：{col_name}")
+        return 0
+
+# --- 資料計算：股票 + 現金 ---
 result = calculate_monthly_asset_value(
     filepath_transaction=TRANSACTION_FILE,
     filepath_cash=CASH_ACCOUNT_FILE
 )
-raw_df = result.raw_df
 summary_df = result.summary_df
 summary_stock_df = result.summary_stock_df
 summary_cash_df = result.summary_cash_df
+raw_df = result.raw_df
 stock_price_df = result.stock_price_df
+stock_value_df = result.stock_value_df
 fx_df = result.fx_df
+all_months = result.all_months
 
-# --- 從 snapshot 中抓取日期資訊 ---
-latest_month = stock_price_df.index.max()
-price_date_str = stock_price_df.loc[latest_month, '資料日期'].strftime('%Y-%m-%d')
+# --- 將 index 轉為字串格式以利顯示 ---
+summary_df.index = summary_df.index.astype(str)
 
-# --- 匯率資訊 ---
-fx_rate_value = fx_df.loc[latest_month, 'USD']
-fx_date_str = fx_df.loc[latest_month, '來源'] if '來源' in fx_df.columns else price_date_str
+# --- 自動抓出資者名稱：只抓 base 欄位名（無底線） ---
+owners = [col for col in summary_df.columns if col not in ("Total") and "_" not in col]
 
-# --- 現金資料 ---
-cash_df = parse_cash_balances()
-latest_month_cash = cash_df.index.max()
+# --- 顯示資產摘要 ---
+st.title(f"\U0001F496 我想和你一起慢慢變富")
+latest = summary_df.iloc[-1]
+for owner in owners:
+    tw_stock = safe_last(summary_df, f"{owner}_TW_STOCK")
+    us_stock = safe_last(summary_df, f"{owner}_US_STOCK")
+    tw_cash = safe_last(summary_cash_df, f"{owner}_TWD_CASH")
+    us_cash = safe_last(summary_cash_df, f"{owner}_USD_CASH")
+    total = tw_stock + us_stock + tw_cash + us_cash
+    st.markdown(f"**{owner}**：TWD {total:,.0f}（台股 TWD {tw_stock:,.0f}／美股 TWD {us_stock:,.0f}／台幣現金 TWD {tw_cash:,.0f}／美金現金 TWD {us_cash:,.0f}）")
 
-# --- 真正的資料來源時間 ---
-data_dates = {
-    "💰 現金資料": latest_month_cash.strftime("%Y-%m"),
-    "📈 股價資料(美股)": price_date_str,
-    "💱 匯率資料": fx_date_str
-}
-min_date = min(data_dates.values())
+st.markdown(f"**Sean&Lo**：TWD {summary_df['Total'].iloc[-1]:,.0f}")
 
-# --- 標題區塊 ---
-st.title(f"📌 目前持股與現金（資料時間：{min_date}）")
-st.caption("📌 各資料來源時間：")
-for label, dt in data_dates.items():
-    st.caption(f"{label} ➔ {dt}")
+# --- 總資產跑動（用 summary_df） ---
+st.subheader("Sean&Lo總資產")
+default_selection = owners + ['Total']
+selected_lines = st.multiselect("請選擇要顯示的資產線", options=default_selection, default=default_selection)
+if selected_lines:
+    st.line_chart(summary_df[selected_lines])
+else:
+    st.info("請至少選擇一條資產線來顯示。")
 
-# --- 顯示表格 ---
-st.subheader("📌 目前持股與即時股價")
-holdings = result.raw_df.groupby(['出資者', '股票代號', '幣別'])['股數'].sum().reset_index()
-latest_prices = stock_price_df.loc[latest_month].drop('資料日期')
-holdings['即時股價'] = holdings['股票代號'].map(latest_prices.to_dict()).fillna(0)
-holdings['股價日期'] = price_date_str
-holdings['市值（原幣）'] = holdings['股數'] * holdings['即時股價']
-holdings['匯率'] = holdings['幣別'].apply(lambda c: fx_rate_value if c == 'USD' else 1.0)
-holdings['市值（TWD）'] = holdings['市值（原幣）'] * holdings['匯率']
-holdings['匯率日期'] = fx_date_str
+# --- 各類資產跑動詳細（含股票與現金） ---
+st.subheader("各類資產跑動詳細(含股票與現金)")
+total_asset_df = pd.concat([stock_value_df, summary_cash_df], axis=1).fillna(0)
 
-st.dataframe(
-    holdings[['出資者', '股票代號', '股數', '即時股價', '股價日期', '市值（原幣）', '匯率', '市值（TWD）', '匯率日期']].style.format({
-        '股數': "{:.0f}",
-        '即時股價': "{:.2f}",
-        '市值（原幣）': "{:,.0f}",
-        '匯率': "{:.2f}",
-        '市值（TWD）': "{:,.0f}"
-    })
-)
+for owner in owners:
+    columns = [col for col in total_asset_df.columns if col.startswith(owner + "_")]
+    df = total_asset_df[columns].copy()
+    if df.empty:
+        st.warning(f"找不到 {owner} 的資料")
+        continue
+    latest = df.iloc[-1]
+    sorted_codes = latest[latest > 0].sort_values(ascending=False).index.tolist()
+    zero_codes = latest[latest == 0].index.tolist()
+    df = df[sorted_codes + zero_codes]
+    df.columns = [col.replace(owner + "_", "") for col in df.columns]
+    df.index = df.index.astype(str)
+    st.markdown(f"#### {owner} 每月資產變化（目前資產 NT${summary_df.iloc[-1].get(owner, 0):,.0f} 元）")
+    st.bar_chart(df)
 
-# --- 資產總和 ---
-holdings['市場類別_TWD'] = holdings['幣別'].map({'TWD': '台股資產(TWD)', 'USD': '美股資產(TWD)'})
-holdings['市場類別_USD'] = holdings['幣別'].map({'USD': '美股資產(USD)'}).fillna('')
+# --- 資料表顯示 summary ---
+st.subheader("📊 整合後每月資產資料表 summary_df")
+st.dataframe(summary_df[::-1].style.format("{:,.0f}"))
 
-summary_TWD = holdings.groupby(['出資者', '市場類別_TWD'])['市值（TWD）'].sum().unstack(fill_value=0)
-summary_USD = holdings.groupby(['出資者', '市場類別_USD'])['市值（原幣）'].sum().unstack(fill_value=0)
-summary = summary_TWD.join(summary_USD.rename(columns={"": "美股資產(USD)"}), how='outer').fillna(0).reset_index()
-
-# 加入現金資料明細
-cash_detail = get_latest_cash_detail()
-cash_df_summary = cash_detail.pivot_table(
-    index='擁有者',
-    columns='分類',
-    values='金額分攤',
-    aggfunc='sum'
-).fillna(0)
-
-summary['美金現金(USD)'] = summary['出資者'].map(lambda x: cash_df_summary.loc[x, ['美金活存', '美金投資帳戶']].sum() / fx_rate_value if x in cash_df_summary.index else 0)
-summary['美金現金(TWD)'] = summary['美金現金(USD)'] * fx_rate_value
-summary['美金定存(USD)'] = summary['出資者'].map(lambda x: cash_df_summary.loc[x, ['美金定存']].sum() / fx_rate_value if x in cash_df_summary.index else 0)
-summary['美金定存(TWD)'] = summary['美金定存(USD)'] * fx_rate_value
-summary['台幣現金(TWD)'] = summary['出資者'].map(lambda x: cash_df_summary.loc[x, ['台幣活存', '台幣投資帳戶']].sum() if x in cash_df_summary.index else 0)
-
-# 加入總資產（TWD）
-summary['總資產(TWD)'] = (
-    summary.get('台股資產(TWD)', 0) +
-    summary.get('美股資產(TWD)', 0) +
-    summary.get('美金現金(TWD)', 0) +
-    summary.get('美金定存(TWD)', 0) +
-    summary.get('台幣現金(TWD)', 0)
-)
-
-# 加入 Total 總和列
-total_row = {col: summary[col].sum() if pd.api.types.is_numeric_dtype(summary[col]) else 'Total' for col in summary.columns}
-summary = pd.concat([summary, pd.DataFrame([total_row])], ignore_index=True)
-
-float_cols = summary.select_dtypes(include='number').columns
-st.dataframe(summary.style.format({col: "{:,.0f}" for col in float_cols}))
-
-# --- 現金細項分類表格 ---
-st.subheader("📋 最新月份現金分類明細")
-latest_cash = get_latest_cash_detail()
-st.dataframe(latest_cash.style.format({
-    "金額": "{:,.0f}",
-    "TWD金額": "{:,.0f}",
-    "金額分攤": "{:,.0f}"
-}))
+# --- 資料表顯示 fx ---
+st.subheader("📊 整合後每月資產資料表 fx_df")
+st.dataframe(fx_df[['USD']][::-1].style.format("{:.2f}"))
+st.subheader("📈 美金匯率變化")
+try:
+    fx_snapshot = pd.read_parquet(FX_SNAPSHOT_PATH)
+    if isinstance(fx_snapshot.index, pd.PeriodIndex):
+        fx_snapshot.index = fx_snapshot.index.to_timestamp()
+    usd_rate = fx_snapshot["USD"].sort_index(ascending=False)
+    st.line_chart(usd_rate.rename("USD匯率"))
+except Exception as e:
+    st.error(f"❌ 無法讀取匯率資料：{e}")

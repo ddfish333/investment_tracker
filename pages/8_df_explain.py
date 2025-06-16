@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 from modules.asset_value import calculate_monthly_asset_value
-from modules.cash_parser import parse_cash_balances, get_latest_cash_detail
+from modules.cash_parser import parse_cash_balances
 from config import TRANSACTION_FILE
 
 st.set_page_config(page_title="DEBUG 資產表", layout="wide")
@@ -18,13 +18,18 @@ stock_value_df = result.stock_value_df
 fx_df = result.fx_df
 all_months = result.all_months
 
+# --- raw_df有哪些欄位 ---
 
+st.subheader("🔍 raw_df 欄位總覽")
+st.dataframe(raw_df.head())
 
 # --- 現金資料計算 ---
 cash_summary = parse_cash_balances()
 
 # --- 合併成 total_asset_df（每人每月每資產類型）---
 total_asset_df = pd.concat([stock_value_df, cash_summary], axis=1).fillna(0)
+
+
 
 # --- 顯示目前每人每股票剩餘股數 ---
 st.subheader("📌 每人每股票目前持股數量（依 raw_df 計算）")
@@ -53,22 +58,5 @@ st.dataframe(filtered_stock_value_df[::-1].style.format("{:,.0f}"))
 # --- 顯示 cash_summary ---
 st.subheader("💵 cash_summary（每人每月現金資產）")
 st.dataframe(cash_summary[::-1].style.format("{:,.0f}"))
-
-# --- 顯示 raw_df ---
-# 自動選出數值欄位
-st.subheader("raw_df (讀取transaction後轉為df)")
-float_cols = raw_df.select_dtypes(include='number').columns
-# 只格式化這些欄位
-st.dataframe(raw_df[::-1].style.format({col: "{:,.0f}" for col in float_cols}))
-
-# --- 顯示 latest_cash_detail ---
-st.subheader("🧾 get_latest_cash_detail()（最新月份的現金帳戶細節）")
-try:
-    latest_cash_detail_df = get_latest_cash_detail()
-    float_cols = latest_cash_detail_df.select_dtypes(include='number').columns
-    st.dataframe(latest_cash_detail_df.style.format({col: "{:,.0f}" for col in float_cols}))
-except Exception as e:
-    st.error(f"❌ 無法載入最新現金帳戶資料：{e}")
-
 
 
